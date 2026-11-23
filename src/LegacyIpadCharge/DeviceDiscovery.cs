@@ -37,9 +37,9 @@ internal static class DeviceDiscovery
 {
     private static readonly Guid UsbHubClass = new("f18a0e88-c30c-11d0-8815-00a0c906bed8");
     private static readonly Guid WinRtUsbClass = new("dee824ef-729b-4a0e-9c14-b7117d33a817");
-    private static readonly Guid DeviceProperties = new("a45c254e-df1c-4efd-8020-67d146a850e0");
+    internal static readonly Guid DeviceProperties = new("a45c254e-df1c-4efd-8020-67d146a850e0");
     private static readonly Guid TopologyProperties = new("4340a6c5-93fa-4706-972c-7b648008a5a7");
-    private static readonly Guid StackProperties = new("540b947e-8b40-45bc-a8a2-6a0b894cbda2");
+    internal static readonly Guid StackProperties = new("540b947e-8b40-45bc-a8a2-6a0b894cbda2");
     private static readonly Regex UsbLocation = new(
         @"^(?:PCIROOT|ACPI|ACPI_HAL)\([A-Z0-9_]+\)(?:#(?:ACPI|PCI)\([A-Z0-9_]+\))*#USBROOT\(\d+\)(?:#USB\(\d+\))+$",
         RegexOptions.CultureInvariant);
@@ -122,7 +122,9 @@ internal static class DeviceDiscovery
 
 internal static class ConfigurationManager
 {
-    private const uint PresentUsbEnumerator = 0x101;
+    private const uint UsbEnumerator = 0x1;
+    private const uint PresentDevices = 0x100;
+    private const uint PhantomDevice = 0x1;
     private const uint PresentInterfaces = 0;
     private const uint EnumerateInterfaceClasses = 1;
     private const uint BufferSmall = 0x1A;
@@ -135,13 +137,14 @@ internal static class ConfigurationManager
     private const uint DeviceHasProblem = 0x400;
     private const string Library = "cfgmgr32.dll";
 
-    internal static string[] UsbInstanceIds()
+    internal static string[] UsbInstanceIds(bool presentOnly = true)
     {
+        var flags = UsbEnumerator | (presentOnly ? PresentDevices : 0);
         for (var attempt = 0; attempt < 3; attempt++)
         {
-            Check(CM_Get_Device_ID_List_SizeW(out var size, "USB", PresentUsbEnumerator));
+            Check(CM_Get_Device_ID_List_SizeW(out var size, "USB", flags));
             var buffer = new char[size];
-            var result = CM_Get_Device_ID_ListW("USB", buffer, size, PresentUsbEnumerator);
+            var result = CM_Get_Device_ID_ListW("USB", buffer, size, flags);
             if (result == BufferSmall)
                 continue;
             Check(result);
@@ -150,9 +153,9 @@ internal static class ConfigurationManager
         throw new IOException("PnP inventory changed during all three enumeration attempts.");
     }
 
-    internal static uint? Locate(string id)
+    internal static uint? Locate(string id, bool includePhantom = false)
     {
-        var result = CM_Locate_DevNodeW(out var devInst, id, 0);
+        var result = CM_Locate_DevNodeW(out var devInst, id, includePhantom ? PhantomDevice : 0);
         if (result == NoSuchDevNode)
             return null;
         Check(result);

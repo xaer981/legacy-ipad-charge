@@ -25,6 +25,14 @@ body:
     validations:
       required: true
   - type: input
+    id: tool-version
+    attributes:
+      label: Tool version or source commit
+      description: Include the release tag, the output of legacy-ipad-charge.exe --version, or the commit used for a source build. If you ran a stock-driver check without the tool, say so.
+      placeholder: v0.1.0
+    validations:
+      required: true
+  - type: input
     id: windows
     attributes:
       label: Windows version and build
@@ -43,13 +51,13 @@ body:
     id: usb-report
     attributes:
       label: USB report
-      description: Paste the reviewed usb-report.json from the README quick start.
+      description: Paste the reviewed usb-report.json from the Help section of the README.
       render: json
   - type: textarea
     id: result
     attributes:
       label: What happened?
-      description: For a charging test, include the mode, limit, duration, iPad workload, restore result, and whether USB data stayed connected. Add any charge icon observations, USB meter readings, or ioreg measurements before, during, and after the test. Include driver and tool versions if known.
+      description: For a charging test, include the mode, limit, duration, iPad workload, restore result, and whether USB data stayed connected. Add any charge icon observations, USB meter readings, or ioreg measurements before, during, and after the test. Include the libusb-win32 version if known.
       placeholder: Windows detected the iPad with the stock Apple driver.
     validations:
       required: true

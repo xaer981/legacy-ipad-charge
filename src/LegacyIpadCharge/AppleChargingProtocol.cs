@@ -34,8 +34,8 @@ internal sealed record UsbTransportCapabilities(string State, bool? WinUsbServic
         var nodes = devices.SelectMany(device => device.Functions.Prepend(device.Device));
         var winUsbSeen = nodes.Any(node => string.Equals(node.Service, "WinUSB", StringComparison.OrdinalIgnoreCase));
         return new(nameof(ChargingState.ReadOnly), winUsbSeen, winUsbSeen
-            ? "WinUSB service is visible in PnP. Endpoint 0 transport remains unverified."
-            : "No WinUSB service is visible in PnP. No documented endpoint 0 transport is available in this release.");
+            ? "WinUSB service is visible in PnP. WinUSB endpoint 0 access remains unverified."
+            : "No WinUSB service is visible in PnP. Use charge check to verify the libusb0 filter.");
     }
 }
 
@@ -46,7 +46,7 @@ internal interface IUsbChargingTransport
 
 internal static class ChargingController
 {
-    // No production transport implements this interface in the read-only CLI.
+    // This diagnostic fixture has no production transport.
     internal static ChargingState Simulate(UsbSetupPacket packet, IUsbChargingTransport? transport)
     {
         if (!AppleChargingProtocol.IsKnownFixture(packet))

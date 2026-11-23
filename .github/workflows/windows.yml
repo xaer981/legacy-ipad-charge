@@ -24,23 +24,28 @@ jobs:
           dotnet build LegacyIpadCharge.slnx '-p:Platform=Any CPU' -warnaserror
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           dotnet run --no-build --project tests/LegacyIpadCharge.Tests -p:Platform=AnyCPU
-      - name: Check libusb workflows in Windows PowerShell 5.1
-        shell: powershell
-        run: |
-          powershell.exe -NoProfile -File .\tools\Invoke-LibusbChargeTrial.ps1
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          .\tests\Test-LibusbWorkflows.ps1
-      - name: Check libusb workflows in PowerShell 7
-        shell: pwsh
-        run: |
-          pwsh.exe -NoProfile -File .\tools\Invoke-LibusbChargeTrial.ps1
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          .\tests\Test-LibusbWorkflows.ps1
       - name: Build Windows x64 release ZIP
         shell: pwsh
         run: .\tools\Build-Release.ps1
+      - name: Check the packaged CLI
+        shell: pwsh
+        run: |
+          $output = Join-Path $env:RUNNER_TEMP 'legacy-ipad-charge'
+          Expand-Archive -LiteralPath bin/release/legacy-ipad-charge-windows-x64.zip -DestinationPath $output
+          if (Get-ChildItem -LiteralPath $output -Recurse -Filter '*.ps1') { throw 'Unexpected PowerShell script in the ZIP.' }
+          $cli = Join-Path $output 'legacy-ipad-charge.exe'
+          $version = & $cli --version
+          if ($LASTEXITCODE -ne 0 -or $version -notmatch '^\d+\.\d+\.\d+$') { throw 'Missing or invalid CLI version.' }
+          $help = & $cli --help
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (($help -join "`n") -notmatch 'charge restore' -or ($help -join "`n") -notmatch 'filter remove') {
+            throw 'Missing charging or filter commands.'
+          }
+          $help
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: legacy-ipad-charge-windows-x64
-          path: bin/release/legacy-ipad-charge-windows-x64.zip
+          path: |
+            bin/release/legacy-ipad-charge-windows-x64.zip
+            bin/release/SHA256SUMS.txt
           if-no-files-found: error

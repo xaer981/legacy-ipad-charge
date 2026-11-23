@@ -1,5 +1,4 @@
 <Solution>
   <Project Path="src/LegacyIpadCharge/LegacyIpadCharge.csproj" />
   <Project Path="tests/LegacyIpadCharge.Tests/LegacyIpadCharge.Tests.csproj" />
-  <Project Path="tools/LegacyIpadCharge.GetStatusProbe/LegacyIpadCharge.GetStatusProbe.csproj" />
 </Solution>

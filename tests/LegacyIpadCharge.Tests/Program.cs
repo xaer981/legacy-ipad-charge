@@ -66,7 +66,7 @@ var tests = new (string Name, Action Run)[]
               "ExternalConnected" = No
               "AdapterDetails" = {
                   "Description" = "SYNTHETIC-PRIVATE"
-                  "Voltage" = 5000
+                  "AdapterVoltage" = 5000
                   "nested" = {"Watts"=12}
                   "Amperage" = invalid
               }
@@ -144,6 +144,10 @@ var tests = new (string Name, Action Run)[]
         Equal(good, readings.Single());
         Equal(true, messages.ToString().Contains("sample lost", StringComparison.Ordinal));
     }),
+    ("libusb request bytes and device identity", LibusbWorkflowTests.RequestsAndDevices),
+    ("Charging limits, timed restore, and interrupted requests", LibusbWorkflowTests.Charging),
+    ("Existing rollback files and recoverable filter installation", LibusbWorkflowTests.Installation),
+    ("Rollback protects unrelated and active driver bindings", LibusbWorkflowTests.Rollback),
     ("SSH destination validation", () =>
     {
         Equal(true, BatteryTelemetry.ValidSshHost("mobile@ipad.local"));

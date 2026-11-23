@@ -26,14 +26,11 @@ try {
     Copy-Item -LiteralPath 'QUICKSTART.md' -Destination (Join-Path $content 'README.md')
     foreach ($file in @(
         'LICENSE'
-        'tools/Install-LibusbChargeFilter.ps1'
-        'tools/Invoke-LibusbChargeTrial.ps1'
-        'tools/Remove-LibusbChargeFilter.ps1'
-        'tools/LibusbCharge.InstallState.ps1'
+        'docs/README.md'
         'docs/libusb-charge.md'
         'docs/compatibility.md'
         'docs/diagnostics.md'
-        'docs/feasibility.md'
+        'docs/references.md'
     )) {
         $destination = Join-Path $content $file
         $null = [IO.Directory]::CreateDirectory([IO.Path]::GetDirectoryName($destination))
@@ -62,7 +59,9 @@ try {
     } else {
         [IO.File]::Move($temporaryZip, $archive)
     }
-    Get-FileHash -LiteralPath $archive -Algorithm SHA256
+    $hash = Get-FileHash -LiteralPath $archive -Algorithm SHA256
+    Set-Content -LiteralPath (Join-Path $release 'SHA256SUMS.txt') -Encoding Ascii -Value "$($hash.Hash)  $assetName"
+    $hash
 } finally {
     Pop-Location
     $resolvedStage = (Resolve-Path -LiteralPath $stage).ProviderPath

@@ -1,19 +1,22 @@
 # iPad compatibility
 
-The charging script currently targets the iPad 2 GSM (`05AC:12A2`). Owners of any candidate model can [report their iPad](#report-your-ipad) using read-only diagnostics with the stock Apple driver.
+[All guides](README.md) · [Quick start](../README.md#quick-start)
 
-Charging was tested on Windows 11 x64. [Windows 10 x64 is untested](libusb-charge.md#windows-10-x64-untested).
+The CLI automatically selects one connected iPad from the table below. Disconnect other listed iPads before installing or charging. For experimental IDs, start with a timed 1,000 mA trial and verify charging and USB data before trying a higher current. If an ID is missing from the table, use the read-only CLI to [report your iPad](#report-your-ipad).
 
-| iPad | Model numbers | Connector | Windows charging trial |
+The `v0.1.0` executable was tested on iPad 2 GSM with Windows 11 x64. [Windows 10 x64 status](libusb-charge.md#windows-10-x64-untested)
+
+| Example iPad models | USB ID | Connector | Charging status on Windows |
 | --- | --- | --- | --- |
-| iPad (2010) | `A1219`, `A1337` | 30-pin | Awaiting a report |
-| iPad 2 Wi-Fi and CDMA | `A1395`, `A1397` | 30-pin | Awaiting a report |
-| iPad 2 GSM | `A1396` | 30-pin | [2,000 mA request tested for 30 minutes](#tested-configuration) |
-| iPad (3rd generation) | `A1416`, `A1430`, `A1403` | 30-pin | Awaiting a report |
-| iPad (4th generation) | `A1458`, `A1459`, `A1460` | Lightning | Awaiting a report |
-| Early iPad mini and iPad Air | [Look up your exact model](https://support.apple.com/en-us/108043) | Lightning | Awaiting a report |
+| iPad (2010) | `05AC:129A` | 30-pin | Experimental |
+| iPad 2 Wi-Fi | `05AC:129F` | 30-pin | Experimental |
+| iPad 2 GSM | `05AC:12A2` | 30-pin | [Three-minute trials at 1 A and 2 A with `v0.1.0`](#tested-configuration) |
+| iPad 2 CDMA | `05AC:12A3` | 30-pin | Experimental |
+| iPad (3rd generation) | `05AC:12A4`, `05AC:12A5`, `05AC:12A6` | 30-pin | Experimental |
+| iPad 2 Wi-Fi (rev. A), early iPad mini | `05AC:12A9` | 30-pin or Lightning | Experimental |
+| iPad (4th generation), early iPad Air and iPad mini | `05AC:12AB` | Lightning | Experimental |
 
-Apple's [model guide](https://support.apple.com/en-us/108043) shows where to find the model number on the back. A USB PID can be shared, and the Wi-Fi iPad 2 has multiple revisions under `A1395`. Include `ProductType` if available, such as `iPad2,4`. The candidate list draws on the [Linux `usb_charge` implementation](https://github.com/FD-/usb_charge/blob/master/usb_charge.c#L10-L21).
+The model names and candidate IDs come from the [Linux implementations](references.md#apple-usb-charging). A USB ID can be shared across models. Use `devices` to read the connected iPad's ID and [Apple's model guide](https://support.apple.com/en-us/108043) to look up its A-number.
 
 ## Tested configuration
 
@@ -21,40 +24,36 @@ Apple's [model guide](https://support.apple.com/en-us/108043) shows where to fin
 | --- | --- |
 | iPad | iPad 2 GSM, `A1396`, `iPad2,2`, USB `05AC:12A2`, iOS 9.3.5 |
 | iOS setup | Jailbreak and SSH access for `ioreg` telemetry. A charging trial on stock iOS is pending. |
-| Windows | Windows 11 x64, Secure Boot enabled. Memory Integrity (HVCI) was inactive when checked. |
+| Windows | Windows 11 x64 build 26300, Secure Boot enabled. Memory Integrity (HVCI) was inactive when checked. |
 | Drivers | Apple USB `538.0.0.0` with `libusb-win32 1.4.0.2 x64` as a per-device filter |
-| USB path | Rear Thunderbolt 4, USB-C to USB-A adapter, 30-pin USB data cable |
-| Workload | iPad acting as an active USB second display |
+| USB path | The tester confirmed at least 2 A at 5 V with data for the connection used in the `v0.1.0` trials. |
+| Data check | Windows opened the iPad's `Internal Storage` during the trials and after rollback. |
 
-The README figure uses a three-minute trial at a reported 1,500 mA adapter limit. Median battery current went from −647 mA to +201 mA. The iPad reported 500 mA after the timed restore, and the USB data session stayed active. [Lab measurements](feasibility.md#три-минуты-при-15-а-со-скриптом-из-репозитория)
+On 23 November 2026, the `v0.1.0` executable ran both trials for 180 seconds. Each trial sent the 500 mA restore and `ioreg` confirmed the baseline afterward.
 
-The same iPad accepted both limits in a later pair of three-minute trials.
+| Limit during trial | Successful `ioreg` samples at that limit | Median battery current before → during → after | Storage checks during trial |
+| ---: | ---: | ---: | ---: |
+| 1,000 mA | 34 | −1,065 → −49 → −567 mA | 12 of 12 |
+| 2,000 mA | 36 | −566 → +358 → −619 mA | 12 of 12 |
 
-| Limit reported by iPad | Median battery current | Limit after restore |
-| ---: | ---: | ---: |
-| 1,500 mA | +207 mA | 500 mA |
-| 2,000 mA | +212 mA | 500 mA |
+The 1 A trial skipped two samples after SSH read errors. The README figure shows the 2 A trial. Input limits and battery current come from `ioreg`. USB bus current was not measured. Hands-on tests covered `charge trial`. The separate `charge enable` command is covered by automated tests. [Check the USB port](libusb-charge.md#check-the-usb-port)
 
-The trials used iOS telemetry. [Comparison measurements](feasibility.md#три-минуты-при-15-и-20-а)
+### Earlier PowerShell results
 
-In a subsequent 30-minute trial on the same USB path, all 298 successful samples showed the 2,000 mA limit. Median battery current was +210 mA, and all six post-restore samples reported 500 mA. The trial measured battery current through `ioreg`. The USB bus current and the USB-C to USB-A adapter's rating remain unverified. Check your own port rating before using this limit. [30-minute trial](feasibility.md#30-минут-при-20-а) · [Check the USB port](libusb-charge.md#check-the-usb-port)
-
-Controlled charging trials on stock iOS and without an active USB data workload are pending.
+The first public release used PowerShell for charging tests. On the same iPad, a three-minute 1.5 A trial showed −647 → +201 mA median battery current. Later three-minute trials showed +207 mA at 1.5 A and +212 mA at 2 A. A 30-minute trial reported 2 A across 298 successful samples, with a median of +210 mA and six samples at 500 mA after restore. These tests used a rear Thunderbolt 4 port, a USB-C to USB-A adapter, and a 30-pin data cable. The adapter's rating for those earlier tests was unverified.
 
 ## Filter installation and rollback
 
-On 23 November 2026, the installer and rollback scripts from the release ZIP were tested with the same A1396 and Apple USB driver on Windows 11 x64 build 26300. Secure Boot was enabled and Memory Integrity was inactive. The previous filter was fully removed before testing the installer.
+The `v0.1.0` ZIP was tested from the stock Apple stack. `filter install` created a rollback file. After reconnecting the iPad, `charge check` reported `PASS`.
 
-After reconnecting the iPad, `-CheckDevice` confirmed that the filter was active. File Explorer could enumerate the iPad's internal storage with the filter loaded and after rollback. Rollback removed the libusb-win32 package, service, driver file, and installation journal while preserving the Apple USB driver.
+`filter remove` detached the filter. After reconnecting, a second invocation removed the package, service, driver file, and installation journal. Windows kept Apple USB 538.0.0.0, File Explorer opened the iPad's storage, and `ioreg` reported 500 mA.
 
-A separate test on the same PC ran `-Enable -LimitMa 1000` followed by a manual `-Restore` from the release ZIP. The iPad reported 500 → 1,000 → 500 mA in `ioreg`, and Windows could enumerate the iPad's internal storage at each step. [Manual restore test](feasibility.md#ручной-возврат-после-enable)
-
-Testing on a fresh Windows installation, with Memory Integrity enabled, and with manual interruption of an active timed `-RunOnce` trial is pending.
+Earlier PowerShell tests also covered filter installation and rollback. A separate run verified 500 → 1,000 → 500 mA in `ioreg` with a manual restore.
 
 ## Report your iPad
 
-1. Run the [read-only quick start](../README.md#quick-start) and open `usb-report.json` to review the output. If the CLI cannot run, include its error and whether Windows recognized the iPad.
-2. On GitHub, select **Issues → New issue → iPad compatibility report**. Add your model, iOS version, whether the iPad has a jailbreak, Windows version, and the port, cable, and any adapter you used. Paste the reviewed USB report with personal identifiers removed from any additional logs.
+1. Create a [read-only USB report](../README.md#help) and review `usb-report.json`. If the CLI cannot run, include its error and whether Windows recognized the iPad.
+2. On GitHub, select **Issues → New issue → iPad compatibility report**. Include the release tag, the output of `.\legacy-ipad-charge.exe --version`, or the commit for a build from source. Add your model, iOS version, whether the iPad has a jailbreak, Windows version, and the port, cable, and any adapter you used. Paste the reviewed USB report with personal identifiers removed from any additional logs.
 3. Describe what you saw. A report from the stock Apple stack helps identify the device and plan a test. If you completed a charging trial, include the requested limit and duration, iPad workload, charging observations before, during, and after, the result of the restore, and whether USB data stayed connected.
 
 For a charging report, identify the source of your evidence. The Windows log shows transfer outcomes. The iPad's charge icon and battery percentage describe observed behavior. A USB meter measures input current. `ioreg` provides the iOS-reported adapter limit and battery current. Reports with only transfer outcomes are useful for USB compatibility. Confirming a change in charging requires measurements or observed charging behavior.

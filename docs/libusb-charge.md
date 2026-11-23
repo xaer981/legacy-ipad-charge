@@ -1,201 +1,159 @@
 # USB charging on Windows
 
-This guide covers the iPad 2 GSM (`A1396`, `05AC:12A2`) on Windows 11 x64. The script uses the signed libusb-win32 driver as an upper filter on that iPad. Windows keeps `usbccgp` as the parent driver and retains the Apple USB stack.
+The Windows x64 CLI uses the signed libusb-win32 driver as an upper filter for one iPad. Windows keeps the existing Apple USB stack. Check the [device list](compatibility.md) and disconnect any other listed iPads before setup.
 
-[Windows 10](#windows-10-x64-untested) · [Check the USB port](#check-the-usb-port) · [Save the port limit](#save-the-port-limit) · [Install the filter](#install-the-device-filter) · [Charging commands](#charging-commands) · [Run a trial](#run-a-timed-trial) · [Stock iOS](#stock-ios) · [Jailbreak and SSH](#jailbreak-and-ssh) · [Remove the filter](#remove-the-device-filter)
-
-## Before you start
-
-- Confirm that Windows recognizes the iPad over USB with the Apple driver.
-- The trial script runs on Windows and sends the same USB request with either iOS setup. The [hardware trial](compatibility.md#tested-configuration) used a jailbroken iPad. A stock iOS charging trial is pending.
-- Installation and rollback from the release ZIP were verified on the test PC with Secure Boot enabled, after removing a previous filter installation. Testing on a fresh Windows installation and with Memory Integrity enabled is pending. [Installer test](compatibility.md#filter-installation-and-rollback)
+[All guides](README.md) · [Check the USB port](#check-the-usb-port) · [Install the filter](#install-the-device-filter) · [Charging commands](#charging-commands) · [Troubleshooting](#troubleshooting) · [Restore 500 mA](#restore-500-ma) · [Remove the filter](#remove-the-device-filter)
 
 ## Windows 10 x64 (untested)
 
-Windows 10 is a candidate for community testing. The signed libusb-win32 1.4.0.2 package has an x64 INF section for Windows 10 build 16299 and later. Filter installation, USB data continuity during charging, and rollback on Windows 10 still need a hardware test. [Driver release](https://github.com/mcuee/libusb-win32/releases/tag/release_1.4.0.2) · [INF version matching](https://learn.microsoft.com/en-us/windows-hardware/drivers/install/inf-manufacturer-section)
-
-On Windows 10 22H2 x64, use the PowerShell PnP checks in the [installation steps](#install-the-device-filter). After a successful check, follow the same [timed trial](#run-a-timed-trial), [500 mA restore](#restore-500-ma), and [filter removal](#remove-the-device-filter) steps.
-
-The charging script runs in Windows PowerShell 5.1. The optional diagnostic CLI uses .NET 10, whose Windows 10 support depends on the edition. Reports are welcome even if the CLI does not start. Include the Windows edition and build, the Apple driver version, and the last step that worked. [Microsoft .NET support matrix](https://learn.microsoft.com/en-us/dotnet/core/install/windows#supported-versions) · [Report your iPad](compatibility.md#report-your-ipad)
+Installation, USB data continuity during charging, and rollback still need a hardware test on Windows 10. The signed libusb-win32 package includes an x64 INF section for build 16299 and later. The executable includes .NET 10, whose supported Windows 10 editions are listed by Microsoft. Include your Windows edition and build and the last step that worked in any compatibility report. [Driver release](https://github.com/mcuee/libusb-win32/releases/tag/release_1.4.0.2) · [.NET Windows support](https://learn.microsoft.com/en-us/dotnet/core/install/windows#supported-versions) · [Report your iPad](compatibility.md#report-your-ipad)
 
 ## Check the USB port
 
-1. Find the 5 V current rating for the physical port in the PC, motherboard, or hub manual. Look for a rating that applies while that port carries USB data. Confirm the data cable and any adapters support the chosen current at 5 V. Use the lowest rating in the path.
-2. Budget **500 mA** for a USB 2.0 iPad on a standard USB-A data port, including a standard USB 3.x Type-A port. A port documented as **BC 1.2 CDP** supports **1,500 mA** with data. To request **2,000 mA**, confirm support for at least 2 A at 5 V with data on the specific port. If support for a higher current is unknown, stay with the 500 mA baseline. [USB-IF port limits](https://compliance.usb.org/index.asp?Format=Standard&UpdateFile=Policies) · [USB-IF charging port tests](https://compliance.usb.org/index.asp?UpdateFile=Battery+Charging&tgt=post)
-3. Use `inspect` to identify the USB path and `-CheckDevice` to verify that the filter matches the connected iPad. Get the electrical rating from the hardware specifications. `bMaxPower` comes from the device descriptor, and `ioreg` reports the adapter limit recognized by iOS. A data-capable USB meter can measure input voltage and current during the trial. [Diagnostics](diagnostics.md#inspect-an-ipad) · [Timed trial](#run-a-timed-trial)
+1. Confirm the current rating at 5 V for the exact port, data cable, and adapters while carrying USB data. Use the lowest rating in the path.
+2. Budget **500 mA** for a USB 2.0 iPad on a standard USB-A data port. A documented **BC 1.2 CDP** supports **1,500 mA** with data. The default **2,000 mA** request requires a path rated for 2 A at 5 V with data. [USB-IF port limits](https://compliance.usb.org/index.asp?Format=Standard&UpdateFile=Policies) · [USB-IF charging port tests](https://compliance.usb.org/index.asp?UpdateFile=Battery+Charging&tgt=post)
+3. Use `devices` and `inspect --pid <PID>` to identify the iPad and its USB path. Check the electrical rating in your hardware specifications. `bMaxPower` is the device descriptor and `ioreg` reports the limit recognized by iOS. A data-capable USB meter can measure current and voltage during the trial. [USB diagnostics](diagnostics.md#inspect-an-ipad)
+
+Keep the standard USB mode if the lowest rating is unknown or below 1 A. The app saves the limit you enter for this USB connection. It cannot measure what the hardware can supply.
 
 ## Save the port limit
 
-Connect the iPad to the port you verified. From the project folder in 64-bit PowerShell, pass the lowest confirmed current rating at 5 V as `-PortMaxMa` in milliamps. The example below is for a USB path rated for at least 2 A.
+Connect the iPad to the port you checked. From the extracted ZIP folder, save a limit at or below the lowest confirmed rating in milliamps. For the first trial, save 1,000 mA if the port, cable, and any adapter all support it.
 
 ```powershell
-.\tools\Invoke-LibusbChargeTrial.ps1 -ConfirmPort -PortMaxMa 2000
+.\legacy-ipad-charge.exe charge confirm-port --max-ma 1000
 ```
 
-`PORT_LIMIT_SAVED` reports the confirmed limit and the full USB path from Windows. The command stores the rating under `%LOCALAPPDATA%\LegacyIpadCharge\PortLimits` for the current Windows account and sends no USB request. Run it again to update the rating for the same path. Recording 500 mA blocks elevated charging on that path.
-
-`-Enable` and `-RunOnce` compare the requested current with the saved value for the current USB path before sending a request. Moving the iPad to an unconfirmed port blocks charging. A passive cable or adapter swap on the same port can leave the Windows path unchanged. Recheck and update the saved rating when the hardware changes.
+`PORT_LIMIT_SAVED` prints the saved limit and the Windows USB path. Run the command again when the confirmed limit changes. Use the same Windows account for saving a limit and running charging commands. Ratings under `%LOCALAPPDATA%\LegacyIpadCharge\PortLimits` from previous versions are still accepted. Recheck the rating after swapping a cable or adapter because the Windows path can stay the same.
 
 ## Charging commands
 
-Run `tools/Invoke-LibusbChargeTrial.ps1` in 64-bit PowerShell from the project folder. For `-Enable` and `-RunOnce`, `-LimitMa` accepts 1000, 1500, or 2000.
-
-| Mode | Default request | Return to 500 mA |
+| Command | Default request | Return to 500 mA |
 | --- | --- | --- |
-| [`-Enable`](#enable-charging) | 2,000 mA, no timer | Run `-Restore` |
-| [`-RunOnce`](#run-a-timed-trial) | 1,000 mA for 30 seconds | The script sends the restore request when the trial ends |
-| [`-Restore`](#restore-500-ma) | 500 mA | Ends an active trial and sends the USB baseline request |
+| [`charge enable`](#enable-charging) | 2,000 mA, no timer | Run `charge restore` |
+| [`charge trial`](#run-a-timed-trial) | 1,000 mA for 30 seconds | The CLI sends restore when the trial ends |
+| [`charge restore`](#restore-500-ma) | 500 mA | Ends an active trial and sends the USB baseline request |
 
-Set `-LimitMa` explicitly in scripts that rely on a particular current. Both charging modes require a saved rating sufficient for the requested current. [Save the port limit](#save-the-port-limit)
+`charge enable` and `charge trial` accept `--limit-ma 1000`, `1500`, or `2000`. Both require a saved rating sufficient for the request. [Save the port limit](#save-the-port-limit)
 
 ## Install the device filter
 
-Use 64-bit Windows PowerShell as administrator and open the project or release folder. These steps are for a PC without an existing libusb-win32 installation.
-
-1. Connect the iPad and verify USB data works with the Apple driver. Run both preflight commands before installing any driver.
-
-   ```powershell
-   .\tools\Invoke-LibusbChargeTrial.ps1
-   .\tools\Remove-LibusbChargeFilter.ps1 -CheckEnvironment
-   ```
-
-   If PowerShell blocks the scripts, stop here. Verify the source of the files and follow the execution policy for your machine. [PowerShell execution policies](https://learn.microsoft.com/en-us/powershell/module/microsoft.powershell.core/about/about_execution_policies?view=powershell-5.1)
-
-2. Record the PnP properties before installation. Compare the same properties after reconnecting in step 4. This check is available on both Windows 10 and Windows 11.
+1. Connect the iPad and confirm USB data works with the original Apple driver. Run `.\legacy-ipad-charge.exe devices` and verify its USB ID in the [device list](compatibility.md).
+2. Download `libusb-win32-bin-1.4.0.2.zip` from the [libusb-win32 release](https://github.com/mcuee/libusb-win32/releases/tag/release_1.4.0.2). In PowerShell, run this from the folder where you saved the download.
 
    ```powershell
-   $ipads = @(Get-PnpDevice -PresentOnly | Where-Object InstanceId -Match '^USB\\VID_05AC&PID_12A2\\[^\\\s]+$')
-   if ($ipads.Count -ne 1 -or $ipads[0].Status -ne 'OK') { throw 'Expected exactly one ready iPad 2 GSM.' }
-   Get-PnpDeviceProperty -InstanceId $ipads[0].InstanceId |
-       Where-Object KeyName -in @(
-           'DEVPKEY_Device_Service'
-           'DEVPKEY_Device_DriverInfPath'
-           'DEVPKEY_Device_UpperFilters'
-           'DEVPKEY_Device_LowerFilters'
-       ) |
-       Format-Table KeyName, Data -AutoSize
+   Get-FileHash .\libusb-win32-bin-1.4.0.2.zip -Algorithm SHA256
    ```
 
-3. Download `libusb-win32-bin-1.4.0.2.zip` from the [official release](https://github.com/mcuee/libusb-win32/releases/tag/release_1.4.0.2). Run `Get-FileHash -Algorithm SHA256` on the ZIP. The expected SHA-256 is `00004C92CDB99BE36E17FB2377165EB97E63B48BA895BFC04A642EA9C3E26D94`. Extract the whole archive and keep the original INF, catalog, and binaries together.
+   The hash should be `00004C92CDB99BE36E17FB2377165EB97E63B48BA895BFC04A642EA9C3E26D94`. If it matches, extract the entire archive.
 
-   Pass its extracted `bin` directory to the installer. It checks the installer and driver files, backs up the Apple package, and prints the rollback path before staging libusb-win32. Keep the rollback file and the extracted driver files. [Windows driver catalogs](https://learn.microsoft.com/en-us/windows-hardware/drivers/install/catalog-files)
+3. Find PowerShell in the Start menu and choose **Run as administrator**. In the first command, use the folder containing `legacy-ipad-charge.exe`. In the second, use the `bin` folder inside the extracted driver package. The installer saves a backup and prints `Rollback file:` followed by the path you will need to remove the filter. Keep that file and leave the extracted driver package in place.
 
    ```powershell
-   .\tools\Install-LibusbChargeFilter.ps1 -Bin 'C:\path\to\libusb-win32-bin-1.4.0.2\bin'
+   Set-Location "C:\path\to\legacy-ipad-charge"
+   .\legacy-ipad-charge.exe filter install --bin "C:\path\to\libusb-win32-bin-1.4.0.2\bin"
    ```
 
-4. Unplug the iPad and reconnect it to the same USB port. Repeat the PnP property check from step 2. Expect `usbccgp` as the service, the original driver INF and Apple filters, and `libusb0` among the upper filters. Confirm USB data still works, then run `.\tools\Invoke-LibusbChargeTrial.ps1 -CheckDevice` and continue after it reports `PASS`.
+4. Unplug the iPad and reconnect it to the same USB port. Confirm USB data still works and continue after this command reports `PASS`.
+
+   ```powershell
+   .\legacy-ipad-charge.exe charge check
+   ```
+
+## Upgrade from the PowerShell release
+
+Extract the new ZIP into its own folder and keep the original rollback file and driver package. Connect the iPad to the same USB port and test the existing filter with the new executable.
+
+```powershell
+.\legacy-ipad-charge.exe charge check
+```
+
+If the command reports `PASS`, continue using the current filter. The CLI accepts the existing rollback file and the port rating saved for the same USB path. Recheck the rating if you changed the cable or adapter. [Troubleshooting](#troubleshooting) · [Filter rollback](#remove-the-device-filter)
 
 ## Enable charging
 
-Save the USB path's confirmed rating and run a short trial at the intended current. For a longer session, keep the iPad connected and run the enable command. [Save the port limit](#save-the-port-limit) · [Timed trial](#run-a-timed-trial)
+Save the USB path rating and run a trial at the intended current. Keep the iPad connected and run `charge enable` for a longer charging session.
 
 ```powershell
-.\tools\Invoke-LibusbChargeTrial.ps1 -Enable
+.\legacy-ipad-charge.exe charge enable
 ```
 
-For a session at 1,500 mA, pass the limit explicitly.
-
-```powershell
-.\tools\Invoke-LibusbChargeTrial.ps1 -Enable -LimitMa 1500
-```
-
-`ENABLE_OK` means Windows completed the USB transfer. Use `-Restore` to send the baseline request. After reconnecting or restarting, check the current setup before enabling again. [Restore 500 mA](#restore-500-ma)
+Add `--limit-ma 1500` to request 1.5 A. `ENABLE_OK` confirms completion of the USB transfer. Check charging on the iPad or with a meter. After reconnecting the iPad or restarting Windows, check the USB setup before enabling charging again. [Restore 500 mA](#restore-500-ma)
 
 ## Run a timed trial
 
-Verify the port, cable, and adapters support the trial current at 5 V and save the rating. [Check the USB port](#check-the-usb-port) · [Save the port limit](#save-the-port-limit)
-
-1. From the project root in 64-bit Windows PowerShell 5.1 or PowerShell 7, run the self-test and check the device binding. The commands check the request layout and the filter handle without sending a USB control transfer.
+Confirm USB data works, run `charge check`, and save the verified USB-path rating. Start with a 30-second trial at 1,000 mA.
 
 ```powershell
-.\tools\Invoke-LibusbChargeTrial.ps1
-.\tools\Invoke-LibusbChargeTrial.ps1 -CheckDevice
+.\legacy-ipad-charge.exe charge trial
 ```
 
-2. Decide how to observe charging before starting the trial and keep the iPad workload consistent. Use the stock iOS steps if you do not have SSH and `ioreg` access. [Stock iOS](#stock-ios) · [Jailbreak and SSH](#jailbreak-and-ssh)
+After observing charging and data at 1,000 mA, confirm the USB path is rated for your intended current and [update the saved limit](#save-the-port-limit). Use `charge trial --limit-ma 2000` for the default 2 A continuous mode. A trial accepts `--seconds` between 1 and 180. `RAISE_OK` and `RESTORE_OK` show that the requests completed. The CLI attempts restore when the trial ends or when you interrupt it with Ctrl+C.
 
-3. Start with the default 30-second trial at 1,000 mA.
+### Stock iOS
+
+Note the charging indicator before, during, and after the trial. A data-capable USB meter can measure input current under the same workload. Check that Windows still sees the iPad with the meter connected. Hardware validation on stock iOS is pending. [Report your iPad](compatibility.md#report-your-ipad)
+
+### Jailbreak and SSH
+
+With existing SSH and `ioreg` access, start sampling in a second terminal before the trial. Replace `ipad` with your host or SSH alias.
 
 ```powershell
-.\tools\Invoke-LibusbChargeTrial.ps1 -RunOnce
+.\legacy-ipad-charge.exe monitor --source ssh --host ipad --interval 4 --duration 230 --format csv > charge-telemetry.csv
 ```
 
-The script verifies the filter handle against the connected iPad before sending the request. It attempts to restore 500 mA when the timer ends or when you run `-Restore` in another PowerShell window in the same Windows session and user account. `RAISE_OK` and `RESTORE_OK` report completion of the USB transfers. Verify charging using the observations below.
+Compare `adapter_amperage_ma` before, during, and after the trial. Read `instant_amperage_ma` separately for battery current. [Telemetry fields](diagnostics.md#read-battery-current)
 
-The lab also exercised these combinations. Use a USB path rated for the selected current. [Lab results](compatibility.md#tested-configuration)
+## Troubleshooting
 
-```powershell
-.\tools\Invoke-LibusbChargeTrial.ps1 -RunOnce -LimitMa 1000 -Seconds 180
-.\tools\Invoke-LibusbChargeTrial.ps1 -RunOnce -LimitMa 1500 -Seconds 30
-.\tools\Invoke-LibusbChargeTrial.ps1 -RunOnce -LimitMa 1500 -Seconds 180
-.\tools\Invoke-LibusbChargeTrial.ps1 -RunOnce -LimitMa 2000 -Seconds 180
-```
-
-## Stock iOS
-
-1. Start from a freshly connected iPad. Note the charge icon or **Not Charging** message before, during, and after the trial. A short trial may leave the battery percentage unchanged. [Apple's charging guide](https://support.apple.com/en-afri/guide/ipad/ipad997da965/ipados)
-2. If you have an inline USB meter rated for the trial current, use one that passes USB data. Verify Windows still recognizes the iPad with the meter in place. Compare USB input current before the trial, during it, and after the restore under the same workload. The charging icon is a qualitative observation.
-3. Save the trial output and your observations. The Windows log can confirm that the transfers completed. If you have only the log and screen observations, report the current and adapter limit as unmeasured. [Report your iPad](compatibility.md#report-your-ipad)
-
-## Jailbreak and SSH
-
-Use your existing SSH and [`ioreg` access](diagnostics.md#read-battery-current). In a second PowerShell window, start sampling before the trial. For a three-minute trial, this command leaves time to capture the baseline and restore. Replace `ipad` with your SSH host alias. If you use the Windows ZIP, replace `dotnet run --project src/LegacyIpadCharge -p:Platform=AnyCPU --` with `.\legacy-ipad-charge.exe`.
-
-```powershell
-dotnet run --project src/LegacyIpadCharge -p:Platform=AnyCPU -- monitor --source ssh --host ipad --interval 4 --duration 230 --format csv |
-    Tee-Object -FilePath .\charge-telemetry.csv
-```
-
-Check that `adapter_amperage_ma` starts at 500 mA, changes to the requested limit, and returns to 500 mA after `RESTORE_OK`. Record `instant_amperage_ma` separately to see whether the battery is charging or discharging.
+| What you see | What to do next |
+| --- | --- |
+| `devices` doesn't list the iPad | Unlock it and check that Windows recognizes it with a USB data cable. Run `devices` again with only this iPad connected. [Check the USB ID](compatibility.md) |
+| `charge check` doesn't show `PASS` | After installing the filter, unplug the iPad, reconnect it to the same port, and run `charge check` again. If it still fails, collect the error and a [read-only USB report](../README.md#help) before reinstalling. |
+| No confirmed current limit, or the request exceeds it | Check the rating of the current port, cable, and adapter, then [save the confirmed limit](#save-the-port-limit). Use a trial current that fits that limit. |
+| The trial ended without `RESTORE_OK` | Reconnect the iPad to the same port, run `charge check`, then [restore 500 mA](#restore-500-ma) before trying a higher current again. |
 
 ## Restore 500 mA
 
-With the iPad connected and the filter loaded, run the manual restore if needed. A `-Restore` from the same Windows session signals an active trial to finish before sending its own 500 mA request. It waits up to 15 seconds to acquire the operation lock. A saved USB port limit is optional for restore.
+Run this while the iPad is connected and the filter is active. A saved USB-path rating is optional for restore.
 
 ```powershell
-.\tools\Invoke-LibusbChargeTrial.ps1 -Restore
+.\legacy-ipad-charge.exe charge restore
 ```
 
-If the process terminated before restoring the limit or the restore command failed, reconnect the iPad before repeating a trial. With SSH telemetry, check the reported 500 mA baseline. With a USB meter, compare the input current with the pretrial reading under the same workload. Without either reading, record that the baseline could not be measured.
+When run in another terminal under the same Windows account and session, it signals an active trial to finish before sending its own restore. If a process terminates before completing restore, reconnect the iPad before retrying and check the baseline with `ioreg` or a USB meter.
 
 ## Remove the device filter
 
-If you enabled charging, [restore 500 mA](#restore-500-ma) before removing the filter. In an administrator PowerShell, run the rollback command with the file saved before installation.
+[Restore 500 mA](#restore-500-ma) before removing the filter. Use an administrator terminal and the rollback file saved by the installer. Files from previous versions are supported.
 
 ```powershell
-.\tools\Remove-LibusbChargeFilter.ps1 -RollbackFile 'C:\path\to\libusb-rollback.clixml'
+.\legacy-ipad-charge.exe filter remove --rollback-file "C:\path\to\libusb-rollback.clixml"
 ```
 
-If the command asks you to reconnect the iPad, do so and run it again. It detaches the saved iPad's filter first and cleans up the recorded package, service and file once the driver is no longer in use. Confirm Windows recognizes the iPad with its original Apple driver package after rollback.
+If the CLI asks you to reconnect, unplug the iPad, reconnect it, and run the same command again. The CLI detaches the saved iPad's filter first. It removes the recorded package, service, and driver file after the binding is out of use. Confirm that Windows still recognizes the iPad with the original Apple driver.
+
+If you closed the installer window, paste `%LOCALAPPDATA%\LegacyIpadCharge\Backups` into the File Explorer address bar while signed in as the account that installed the filter. Look for `libusb-rollback.clixml` inside the folder for that installation. The rollback command checks that the file matches the active installation.
 
 ### Recover an interrupted or earlier installation
 
-The installer keeps the current installation ID and the staged `oemNN.inf` name in `%WINDIR%\System32\drivers\LegacyIpadCharge-libusb.clixml`. Each new rollback file identifies one installation.
-
-If staging stopped before the published package name was recorded, or you have a rollback file from before the installer script was added, identify the package first.
+If staging stopped before recording the package name, or you have a legacy rollback file from before the installer tracked installations, identify the libusb-win32 package with `pnputil /enum-drivers`. Confirm the published `oemNN.inf` name for the correct `libusb0.inf` package and supply it explicitly.
 
 ```powershell
-Get-WindowsDriver -Online | Where-Object { [IO.Path]::GetFileName($_.OriginalFileName) -eq 'libusb0.inf' }
+.\legacy-ipad-charge.exe filter remove --rollback-file "C:\path\to\libusb-rollback.clixml" --recover-staged-package oem42.inf
 ```
 
-Confirm the listed package belongs to the installation you want to remove. Pass its `Driver` value as `-RecoverStagedPackage`. The rollback also checks the matching package hash and device binding. The example uses `oem42.inf`.
-
-```powershell
-.\tools\Remove-LibusbChargeFilter.ps1 -RollbackFile 'C:\path\to\libusb-rollback.clixml' -RecoverStagedPackage oem42.inf
-```
+The CLI checks the package, driver file, service, and bindings before cleaning up.
 
 ## Protocol details
 
-The script sends one device-recipient vendor OUT request with no data stage. `bRequest=0x40` identifies the Apple request. `wValue=0` sets zero additional current in suspend. `wIndex` is the additional current above the 500 mA baseline while active. [Apple MFi R9, tables 2-8 and 2-9](https://www.scribd.com/document/694737660/MFiAccessoryHardwareSpecificationR9NoRestriction-875543417)
+The CLI sends a device-recipient vendor OUT request with `bRequest=0x40` and no data stage. Its verified request layout uses `wValue=0` and sets `wIndex` to the active current above 500 mA.
 
-| Action | `wIndex` | USB setup bytes |
-| --- | ---: | --- |
-| Restore 500 mA | 0 | `40 40 00 00 00 00 00 00` |
-| Request 1,000 mA | 500 | `40 40 00 00 F4 01 00 00` |
-| Request 1,500 mA | 1,000 | `40 40 00 00 E8 03 00 00` |
-| Request 2,000 mA | 1,500 | `40 40 00 00 DC 05 00 00` |
+| Request | USB setup bytes |
+| --- | --- |
+| 500 mA restore | `40 40 00 00 00 00 00 00` |
+| 1,000 mA | `40 40 00 00 F4 01 00 00` |
+| 1,500 mA | `40 40 00 00 E8 03 00 00` |
+| 2,000 mA | `40 40 00 00 DC 05 00 00` |
 
-The script passes a 24-byte `libusb_request` to `LIBUSB_IOCTL_VENDOR_WRITE`. The filter converts the vendor type (`2`) to `bmRequestType=0x40` on USB. [libusb-win32 request layout](https://github.com/mcuee/libusb-win32/blob/release_1.4.0.2/libusb/src/driver/driver_api.h) · [Request type conversion](https://github.com/mcuee/libusb-win32/blob/release_1.4.0.2/libusb/src/windows.c)
-
-`AdapterDetails` is the limit the iPad reports and `InstantAmperage` is battery current. See the [lab results](feasibility.md#трёхминутное-испытание-до-1-а-на-основном-пк) for both readings.
+The 24-byte `libusb_request` uses vendor type `2` for `LIBUSB_IOCTL_VENDOR_WRITE`. [libusb-win32 request layout](https://github.com/mcuee/libusb-win32/blob/release_1.4.0.2/libusb/src/driver/driver_api.h) · [Hardware results](compatibility.md#tested-configuration)

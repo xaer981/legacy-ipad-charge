@@ -113,7 +113,8 @@ internal static class BatteryTelemetry
             if (token is "}" or "]" or ")")
                 depth--;
             if (depth == 0)
-                return new AdapterDetails(Number(values, "Voltage"), Number(values, "Amperage"),
+                return new AdapterDetails(Number(values, "Voltage") ?? Number(values, "AdapterVoltage"),
+                    Number(values, "Amperage"),
                     Number(values, "Watts"), values.GetValueOrDefault("Description") switch
                     {
                         "\"usb host\"" => "usb host",
@@ -121,7 +122,7 @@ internal static class BatteryTelemetry
                         _ => null
                     });
             if (depth == 1 && i + 2 < tokens.Count && tokens[i + 1].Value == "=" &&
-                token is "\"Voltage\"" or "\"Amperage\"" or "\"Watts\"" or "\"Description\"")
+                token is "\"Voltage\"" or "\"AdapterVoltage\"" or "\"Amperage\"" or "\"Watts\"" or "\"Description\"")
                 values.TryAdd(token[1..^1], tokens[i + 2].Value);
         }
         return null;
