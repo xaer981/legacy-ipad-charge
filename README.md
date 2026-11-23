@@ -19,7 +19,14 @@
 <p align="center"><img src="docs/assets/battery-current.png" width="680" alt="Median battery current rose from −566 mA to +358 mA during a three-minute trial."></p>
 <p align="center"><a href="#test-results">Battery current on an iPad 2 during a 2 A trial with v0.1.0</a></p>
 
+## Problem
+
+An older iPad can lose battery charge while plugged into a Windows PC, especially when used as a second screen or dashboard at full brightness. This tool lets supported iPads request more charging current from a compatible USB connection while keeping USB data active.
+
 ## Before you start
+
+> [!TIP]
+> In my setup, a **USB-A → USB-C adapter** let me use the iPad's original USB-A data cable with a higher-current USB-C port on my PC. Check the 5 V current rating of the port, cable, and adapter while carrying data. [Check your USB path](docs/libusb-charge.md#check-the-usb-port)
 
 - **Windows x64.** Use the ZIP from `v0.1.0` or later. It runs without installing .NET. The tested setup used Windows 11. [Windows 10 status](docs/libusb-charge.md#windows-10-x64-untested)
 - **One iPad and a USB data cable.** Connect the iPad and make sure Windows recognizes it. [Check your iPad model](#devices) · [Check the port, cable, and adapter](docs/libusb-charge.md#check-the-usb-port)
@@ -129,6 +136,11 @@ dotnet run --no-build --project tests/LegacyIpadCharge.Tests -p:Platform=AnyCPU
 ```
 
 The build writes the Windows ZIP and `SHA256SUMS.txt` to `bin/release`.
+
+## Roadmap
+
+- [ ] **Linux** support
+- [ ] **macOS** support
 
 ## Support the project
 
