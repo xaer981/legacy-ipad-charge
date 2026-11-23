@@ -1,0 +1,14 @@
++-o AppleARMPMUCharger  <class AppleARMPMUCharger, registered, matched, active>
+  | {
+  |   "InstantAmperage" = 18446744073709551122
+  |   "Voltage" = 3971
+  |   "ExternalConnected" = Yes
+  |   "IsCharging" = Yes
+  |   "CycleCount" = 545
+  |   "AppleRawMaxCapacity" = 5325
+  |   "DesignCapacity" = 6583
+  |   "Temperature" = 2920
+  |   "Serial" = "SYNTHETIC-PRIVATE"
+  |   "battery-data" = {"Serial"="SYNTHETIC-PRIVATE","Voltage"=1000}
+  |   "AdapterDetails" = {"Watts"=2,"Description"="usb host","Voltage"=5000,"Amperage"=500,"Serial"="SYNTHETIC-PRIVATE"}
+  | }

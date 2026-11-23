@@ -1,0 +1,56 @@
+[Version]
+Signature = "$WINDOWS NT$"
+Class = Extension
+ClassGuid = {e2f84ce7-8efa-411c-aa69-97454ca4cb57}
+ExtensionId = {77d28a33-e902-4815-a461-86f6b8e76bc1}
+Provider = %Provider%
+CatalogFile = LegacyIpadStatus.cat
+DriverVer = 06/01/2025,0.1.0.4
+PnpLockdown = 1
+
+[Manufacturer]
+%Provider% = Models,NTamd64.10.0...22000
+
+[Models.NTamd64.10.0...22000]
+%Description% = Filter,USB\VID_05AC&PID_12A2
+
+[Filter.NT]
+CopyFiles = DriverCopy
+
+[Filter.NT.Services]
+AddService = LegacyIpadStatus,0,FilterService
+
+[Filter.NT.Filters]
+AddFilter = LegacyIpadStatus,0,LowerFilter
+
+[Filter.NT.Wdf]
+KmdfService = LegacyIpadStatus,FilterWdf
+
+[LowerFilter]
+FilterPosition = Lower
+
+[FilterService]
+DisplayName = %Description%
+ServiceType = 1
+StartType = 3
+ErrorControl = 1
+ServiceBinary = %13%\LegacyIpadStatus.sys
+
+[FilterWdf]
+KmdfLibraryVersion = 1.33
+
+[DestinationDirs]
+DriverCopy = 13
+
+[DriverCopy]
+LegacyIpadStatus.sys
+
+[SourceDisksNames]
+1 = %Description%
+
+[SourceDisksFiles]
+LegacyIpadStatus.sys = 1
+
+[Strings]
+Provider = "Legacy iPad USB Charging Lab"
+Description = "Legacy iPad USB control transfer lab filter"

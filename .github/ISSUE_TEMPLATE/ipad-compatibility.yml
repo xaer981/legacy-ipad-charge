@@ -1,0 +1,55 @@
+name: iPad compatibility report
+description: Share a stock USB diagnostic report or the results of a charging trial.
+title: "[Compatibility] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A report from the stock Apple USB driver is welcome. Review anything you paste and remove serial numbers, device instance IDs, and other personal identifiers.
+  - type: input
+    id: ipad
+    attributes:
+      label: iPad model and iOS version
+      description: Include the A-number on the back. Add the ProductType and USB VID/PID if you know them.
+      placeholder: A1396 (iPad2,2), iOS 9.3.5
+    validations:
+      required: true
+  - type: dropdown
+    id: ios-setup
+    attributes:
+      label: iOS setup
+      options:
+        - Stock iOS (no jailbreak)
+        - Jailbreak
+        - Unknown
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version and build
+      description: Include the Apple USB driver version and Memory Integrity status if known.
+      placeholder: Windows 11 x64, build 26100, Apple USB 538.0.0.0
+    validations:
+      required: true
+  - type: input
+    id: connection
+    attributes:
+      label: USB port, cable, and adapters
+      placeholder: Rear USB-A, 30-pin data cable, direct connection
+    validations:
+      required: true
+  - type: textarea
+    id: usb-report
+    attributes:
+      label: USB report
+      description: Paste the reviewed usb-report.json from the README quick start.
+      render: json
+  - type: textarea
+    id: result
+    attributes:
+      label: What happened?
+      description: For a charging test, include the mode, limit, duration, iPad workload, restore result, and whether USB data stayed connected. Add any charge icon observations, USB meter readings, or ioreg measurements before, during, and after the test. Include driver and tool versions if known.
+      placeholder: Windows detected the iPad with the stock Apple driver.
+    validations:
+      required: true

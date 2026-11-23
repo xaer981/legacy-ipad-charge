@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>legacy-ipad-charge</AssemblyName>
+    <RootNamespace>LegacyIpadCharge</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="LegacyIpadCharge.Tests" />
+    <InternalsVisibleTo Include="LegacyIpadCharge.GetStatusProbe" />
+  </ItemGroup>
+</Project>

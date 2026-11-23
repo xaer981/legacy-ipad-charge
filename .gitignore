@@ -1,0 +1,7 @@
+bin/
+obj/
+TestResults/
+.vs/
+/legacy_ipad_usb_charging_codex_TZ.md
+/usb-report.json
+/charge-telemetry.csv
