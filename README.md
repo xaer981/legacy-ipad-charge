@@ -136,7 +136,7 @@ Run these commands as your normal user.
 ./legacy-ipad-charge charge check
 ```
 
-Continue when `devices` shows the iPad with a non-null `locationPath` and `charge check` reports `PASS`. If `locationPath` is `null`, use a physical USB port on a supported native Linux controller for charging.
+Continue when `devices` shows the iPad with a non-null `locationPath` and `charge check` reports `PASS`. In detected VMs and on USB/IP paths, `locationPath` is `null`. Use a physical USB port on a supported native Linux controller for charging.
 
 <details>
 <summary>Fix a USB permission error</summary>

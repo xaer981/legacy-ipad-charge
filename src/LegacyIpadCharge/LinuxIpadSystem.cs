@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Runtime.Intrinsics.X86;
 using System.Text.RegularExpressions;
 
 namespace LegacyIpadCharge;
@@ -16,14 +17,18 @@ internal sealed record LinuxUsbDevice(string Name, UsbIdentity Identity, byte Bu
         PortPath, Ports, null, null, null, new("physical", null, null, [], [], [], [], null, Ready, null), []);
 }
 
-internal sealed class LinuxIpadSystem(string sysfs = "/sys/bus/usb/devices") : IChargeHardware
+internal sealed class LinuxIpadSystem(string sysfs = "/sys/bus/usb/devices", bool? cpuReportsHypervisor = null,
+    string dmi = "/sys/class/dmi/id") : IChargeHardware
 {
+    private const int HypervisorPresent = 1 << 31;
     private static readonly Regex DeviceName = new(@"\A[0-9]+-(?<ports>[0-9]+(?:\.[0-9]+)*)\z",
         RegexOptions.CultureInvariant);
     private static readonly Regex RootName = new(@"\Ausb[0-9]+\z", RegexOptions.CultureInvariant);
     private static readonly Regex PciAddress = new(@"\A[0-9a-f]{4}:[0-9a-f]{2}:[0-9a-f]{2}\.[0-7]\z",
         RegexOptions.CultureInvariant);
     private static readonly Regex UsbVersion = new(@"\A[123]\.[0-9]{2}\z", RegexOptions.CultureInvariant);
+
+    private readonly bool allowPortProfiles = !(cpuReportsHypervisor ?? CpuReportsHypervisor()) && DmiAllowsPortProfiles(dmi);
 
     public ChargeDevice[] Devices() => Read(0x05AC).Where(device => ChargingIpad.Matches(device.Identity))
         .Select(device => device.ToChargeDevice()).ToArray();
@@ -45,12 +50,15 @@ internal sealed class LinuxIpadSystem(string sysfs = "/sys/bus/usb/devices") : I
         string[] entries;
         try { entries = Directory.GetDirectories(sysfs); }
         catch (DirectoryNotFoundException) { return []; }
-        var roots = entries.Where(path => RootName.IsMatch(Path.GetFileName(path)))
-            .Select(path => (Name: Path.GetFileName(path), Key: RootKey(path)))
-            .Where(root => root.Key is not null)
-            .GroupBy(root => root.Key!)
-            .Where(group => group.Count() == 1)
-            .ToDictionary(group => group.Single().Name, group => group.Key);
+        // A guest PCI address can stay the same when the iPad moves to another physical port.
+        Dictionary<string, string> roots = allowPortProfiles
+            ? entries.Where(path => RootName.IsMatch(Path.GetFileName(path)))
+                .Select(path => (Name: Path.GetFileName(path), Key: RootKey(path)))
+                .Where(root => root.Key is not null)
+                .GroupBy(root => root.Key!)
+                .Where(group => group.Count() == 1)
+                .ToDictionary(group => group.Single().Name, group => group.Key)
+            : [];
 
         var devices = new List<LinuxUsbDevice>();
         foreach (var entry in entries)
@@ -65,7 +73,6 @@ internal sealed class LinuxIpadSystem(string sysfs = "/sys/bus/usb/devices") : I
             var portText = match.Groups["ports"].Value;
             var ports = portText.Split('.').Select(port => int.Parse(port, CultureInfo.InvariantCulture)).ToArray();
             var rootName = "usb" + bus.ToString(CultureInfo.InvariantCulture);
-            // A USB/IP controller has no locally verifiable physical port.
             var portPath = roots.TryGetValue(rootName, out var root) ? $"{root}:{portText}" : null;
             var authorized = Attribute(entry, "authorized");
             if (authorized is not null)
@@ -75,14 +82,37 @@ internal sealed class LinuxIpadSystem(string sysfs = "/sys/bus/usb/devices") : I
         return devices.OrderBy(device => device.Bus).ThenBy(device => device.Address).ToArray();
     }
 
+    private static bool CpuReportsHypervisor() =>
+        X86Base.IsSupported && (X86Base.CpuId(1, 0).Ecx & HypervisorPresent) != 0;
+
+    private static bool DmiAllowsPortProfiles(string dmi)
+    {
+        try
+        {
+            return Attribute(dmi, "product_name") is not ("Virtual Machine" or "VirtualBox" or "VMware Virtual Platform" or "KVM") &&
+                Attribute(dmi, "sys_vendor") is not ("QEMU" or "innotek GmbH" or "VMware, Inc." or "Xen");
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return false; }
+    }
+
     private static string? RootKey(string root)
     {
-        var target = new DirectoryInfo(root).ResolveLinkTarget(returnFinalTarget: true);
-        if (target is null || !target.Exists || target is not DirectoryInfo { Parent: { } controller } ||
-            !PciAddress.IsMatch(controller.Name) || Attribute(root, "version") is not { } version ||
-            !UsbVersion.IsMatch(version))
-            return null;
-        return $"linux:pci:{controller.Name}:usb{version}";
+        try
+        {
+            var target = new DirectoryInfo(root).ResolveLinkTarget(returnFinalTarget: true);
+            if (target is null || !target.Exists || target is not DirectoryInfo { Parent: { } controller } ||
+                !PciAddress.IsMatch(controller.Name) || Attribute(root, "version") is not { } version ||
+                !UsbVersion.IsMatch(version) || Attribute(controller.FullName, "vendor") is not { } vendor ||
+                Attribute(controller.FullName, "device") is not { } device)
+                return null;
+
+            // QEMU's xHCI PCI ID identifies an emulated controller even without guest CPU or DMI markers.
+            if ((vendor, device) is ("0x1b36", "0x000d"))
+                return null;
+
+            return $"linux:pci:{controller.Name}:usb{version}";
+        }
+        catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return null; }
     }
 
     private static bool Hex(string path, string name, out ushort value) =>

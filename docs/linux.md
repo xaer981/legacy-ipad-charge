@@ -39,7 +39,7 @@ SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="05ac", ATTR{idPro
 
 Run `sudo udevadm control --reload`, reconnect the iPad to the same port and repeat `charge check`. For a remote or headless session, use your distribution's USB group policy for the same VID/PID. Use the same user account for all charging commands. You can remove the rule file, reload the rules and reconnect the iPad to undo the permission change.
 
-Continue once `charge check` reports `PASS` and `devices` shows a physical `locationPath`. Forwarded USB/IP devices and paths the CLI cannot identify are blocked for higher-current requests. Use a native Linux host with a supported PCI USB controller. `charge restore` can still return an accessible iPad to its baseline.
+Continue once `charge check` reports `PASS` and `devices` shows a physical `locationPath`. In detected VMs, on forwarded USB/IP devices, and on unverified USB paths, `locationPath` is `null`. The CLI blocks `charge confirm-port`, `charge trial`, and `charge enable` in those cases, including when a limit was previously saved. `charge check` and `charge restore` remain available if the iPad is accessible. Use a native Linux host with a supported PCI USB controller to request higher current.
 
 ## 3. Try a higher current
 
