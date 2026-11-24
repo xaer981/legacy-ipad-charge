@@ -41,6 +41,10 @@ jobs:
           if (($help -join "`n") -notmatch 'charge restore' -or ($help -join "`n") -notmatch 'filter remove') {
             throw 'Missing charging or filter commands.'
           }
+          $trialHelp = & $cli charge trial --help
+          if ($LASTEXITCODE -ne 0 -or ($trialHelp -join "`n") -notmatch 'Trial duration \(1-180, default: 30\)') {
+            throw 'Missing command-specific help for the timed trial.'
+          }
           $help
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

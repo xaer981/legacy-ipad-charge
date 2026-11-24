@@ -159,6 +159,9 @@ var tests = new (string Name, Action Run)[]
     })
 };
 
+if (OperatingSystem.IsLinux())
+    tests = [.. tests, ("Linux USB topology, virtual ports, and re-enumeration", LibusbWorkflowTests.LinuxTopology)];
+
 var failed = 0;
 foreach (var test in tests)
 {

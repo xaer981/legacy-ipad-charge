@@ -4,8 +4,8 @@
 
 ## Apple USB charging
 
-- [`mkorenkov/ipad_charge`](https://github.com/mkorenkov/ipad_charge/blob/master/ipad_charge.c) and [`FD-/usb_charge`](https://github.com/FD-/usb_charge/blob/master/usb_charge.c) document the Apple USB request and iPad product IDs on Linux. The Windows CLI uses those IDs to identify candidates. The request layout and Windows driver integration were implemented separately.
-- The Linux tools send a different `wValue` from the one tested here. This project keeps the observed Windows request layout and lists Windows evidence by model in the [compatibility guide](compatibility.md#tested-configuration).
+- The CLI uses candidate iPad USB IDs from the Linux tools [`mkorenkov/ipad_charge`](https://github.com/mkorenkov/ipad_charge/blob/master/ipad_charge.c) and [`FD-/usb_charge`](https://github.com/FD-/usb_charge/blob/master/usb_charge.c). The same ID list applies on Windows and Linux.
+- Both backends use the project's request layout with `wValue=0`. The upstream Linux tools use a different value. See [protocol details](libusb-charge.md#protocol-details) and [hardware results by platform](compatibility.md).
 - [Apple accessory documentation](https://developer.apple.com/accessories/) and the [Linux Apple MFi fast-charge driver](https://github.com/torvalds/linux/blob/master/drivers/usb/misc/apple-mfi-fastcharge.c) provide protocol context.
 
 ## Windows USB stack
@@ -18,4 +18,5 @@
 
 - The project's source and documentation use the [MIT License](../LICENSE).
 - Download [libusb-win32 1.4.0.2](https://github.com/mcuee/libusb-win32/releases/tag/release_1.4.0.2) separately under its own license. The Windows ZIP includes the project's charging and diagnostic executable.
-- The Windows ZIP includes the license and third-party notices for the .NET runtime version used to build the executable.
+- The Linux binary uses the distribution's [libusb-1.0 runtime](https://github.com/libusb/libusb) under its own LGPL license.
+- Each release archive includes the license and third-party notices for the .NET runtime version used to build its executable.

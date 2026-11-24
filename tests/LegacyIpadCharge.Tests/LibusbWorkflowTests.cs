@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Runtime.Versioning;
 using System.Security.Cryptography;
 using System.Text;
 using LegacyIpadCharge;
@@ -15,7 +14,10 @@ internal static class LibusbWorkflowTests
     {
         const string prefix = "B80B000002000000000000004000000000000000";
         foreach (var (offset, suffix) in new[] { (0, "00000000"), (500, "F4010000"), (1000, "E8030000"), (1500, "DC050000") })
+        {
             Check(Convert.ToHexString(LibusbConnection.Request(offset)) == prefix + suffix);
+            Check(Convert.ToHexString(AppleChargingProtocol.ActiveCurrent(offset).ToBytes()) == "40400000" + suffix);
+        }
 
         var buffer = new byte[256];
         var bytes = Encoding.ASCII.GetBytes(@"\Registry\Machine\System\CurrentControlSet\Enum\" + Ipad + "\\Device Parameters\0");
@@ -34,16 +36,16 @@ internal static class LibusbWorkflowTests
 
     internal static void Charging()
     {
+        using var rig = new Rig();
         if (OperatingSystem.IsWindows())
-            RunCharging();
+            RunCharging(rig, new WindowsChargeCoordination(rig.Paths.ChargeLock, @"Local\LegacyIpadCharge-test-" + Guid.NewGuid()));
+        else if (OperatingSystem.IsLinux())
+            RunCharging(rig, new LinuxChargeCoordination(rig.Paths.UserData));
     }
 
-    [SupportedOSPlatform("windows")]
-    private static void RunCharging()
+    private static void RunCharging(Rig rig, IChargeCoordination coordination)
     {
-        using var rig = new Rig();
-        var commands = new ChargeCommands(rig, rig.Paths, @"Local\LegacyIpadCharge-test-" + Guid.NewGuid(),
-            TextWriter.Null, TextWriter.Null);
+        var commands = new ChargeCommands(rig, rig.Paths.UserData, coordination, "mock", TextWriter.Null, TextWriter.Null);
         commands.Check();
         rig.DevicesList = [Device(Candidate)];
         Fails(() => commands.Enable(2000), "No confirmed current limit");
@@ -94,8 +96,58 @@ internal static class LibusbWorkflowTests
 
         rig.Requests.Clear();
         rig.DevicesList = [Device(Candidate) with { LocationPaths = [] }];
+        Fails(() => commands.ConfirmPort(2000), "single USB port path");
+        Fails(() => commands.Trial(1000, TimeSpan.Zero, CancellationToken.None), "single USB port path");
         commands.Restore(CancellationToken.None);
         Check(rig.Requests.SequenceEqual([0]));
+    }
+
+    internal static void LinuxTopology()
+    {
+        using var rig = new Rig();
+        var sysfs = Path.Combine(rig.Paths.Temp, "sysfs");
+        var backend = new LinuxIpadSystem(sysfs);
+        Check(backend.Read(0x05ac).Length == 0);
+        Directory.CreateDirectory(sysfs);
+        LinuxRoot(sysfs, 3, "0000:03:00.0", "2.00");
+        LinuxRoot(sysfs, 4, "vhci_hcd.0", "2.00");
+        var physical = LinuxDevice(sysfs, "3-2.1", "3", "7");
+        var virtualIpad = LinuxDevice(sysfs, "4-2.1", "4", "2");
+        LinuxDevice(sysfs, "3-2.1:1.0", "3", "7");
+        var devices = backend.Read(0x05ac, 0x12a2);
+        Check(devices.Length == 2 && devices[0].Ready && devices[1].Ready);
+        Check(devices[0].PortPath == "linux:pci:0000:03:00.0:usb2.00:2.1");
+        Check(devices[0].Ports.SequenceEqual([2, 1]) && devices[1].PortPath is null);
+
+        Directory.Delete(virtualIpad, recursive: true);
+        var first = ChargingIpad.Select(backend.Devices());
+        File.WriteAllText(Path.Combine(physical, "devnum"), "8\n");
+        var reconnected = ChargingIpad.Select(backend.Devices());
+        Check(first.InstanceId != reconnected.InstanceId && backend.PortPath(first) == backend.PortPath(reconnected));
+        Fails(() => backend.Open(first), "path changed");
+
+        LinuxRoot(sysfs, 5, "0000:03:00.0", "2.00");
+        Check(backend.PortPath(ChargingIpad.Select(backend.Devices())) is null);
+    }
+
+    private static void LinuxRoot(string sysfs, int bus, string controller, string version)
+    {
+        var root = Path.Combine(Path.GetDirectoryName(sysfs)!, controller, $"usb{bus}");
+        Directory.CreateDirectory(root);
+        File.WriteAllText(Path.Combine(root, "version"), version + "\n");
+        Directory.CreateSymbolicLink(Path.Combine(sysfs, $"usb{bus}"), root);
+    }
+
+    private static string LinuxDevice(string sysfs, string name, string bus, string address)
+    {
+        var folder = Path.Combine(sysfs, name);
+        Directory.CreateDirectory(folder);
+        File.WriteAllText(Path.Combine(folder, "idVendor"), "05ac\n");
+        File.WriteAllText(Path.Combine(folder, "idProduct"), "12a2\n");
+        File.WriteAllText(Path.Combine(folder, "busnum"), bus + "\n");
+        File.WriteAllText(Path.Combine(folder, "devnum"), address + "\n");
+        File.WriteAllText(Path.Combine(folder, "authorized"), "1\n");
+        return folder;
     }
 
     internal static void Installation()
@@ -221,6 +273,7 @@ internal static class LibusbWorkflowTests
         internal Action<int>? TransferObserved { get; set; }
 
         public ChargeDevice[] Devices() => DevicesList;
+        public string? PortPath(ChargeDevice device) => ChargingIpad.WindowsPortPath(device);
         public DriverPackage[] Packages() => StoredPackages;
         public DriverService? Service(string name) => name == "libusb0" ? LibusbService : null;
         public bool HasClassFilter() => ClassFilter;

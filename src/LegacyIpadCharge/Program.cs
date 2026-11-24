@@ -7,23 +7,6 @@ using System.Security.Principal;
 using System.Xml;
 using LegacyIpadCharge;
 
-const string Usage = """
-    legacy-ipad-charge --version
-    legacy-ipad-charge devices
-    legacy-ipad-charge inspect [--vid 05AC --pid 12A2]
-    legacy-ipad-charge probe --dry-run [--vid 05AC --pid 12A2]
-    legacy-ipad-charge report --format json|csv [--input <ioreg-file|->]
-    legacy-ipad-charge monitor --source ssh --host [user@]host [--identity <file>]
-                               [--interval 20 --duration 180 --format json|csv]
-    legacy-ipad-charge charge check
-    legacy-ipad-charge charge confirm-port --max-ma <mA>
-    legacy-ipad-charge charge trial [--limit-ma 1000] [--seconds 30]
-    legacy-ipad-charge charge enable [--limit-ma 2000]
-    legacy-ipad-charge charge restore
-    legacy-ipad-charge filter install --bin <libusb-win32-bin-folder>
-    legacy-ipad-charge filter remove --rollback-file <file> [--recover-staged-package oemNN.inf]
-    """;
-
 if (args is ["--version"])
 {
     Console.WriteLine(Assembly.GetExecutingAssembly().GetName().Version!.ToString(3));
@@ -36,25 +19,55 @@ Console.CancelKeyPress += (_, args) =>
     args.Cancel = true;
     stopping.Cancel();
 };
-if (args is [] or ["--help"] or ["-h"] or ["charge" or "filter"] or ["charge" or "filter", "--help" or "-h"] or
-    ["charge" or "filter", _, "--help" or "-h"])
-{
-    Console.WriteLine(Usage);
-    return 0;
-}
-
+string? command = null;
 try
 {
+    var helpTopic = args switch
+    {
+        [] or ["--help" or "-h"] => "",
+        ["charge" or "filter"] => args[0],
+        [var topic, "--help" or "-h"] => topic,
+        ["charge" or "filter", var action, "--help" or "-h"] => $"{args[0]} {action}",
+        _ => null
+    };
+    if (helpTopic is not null)
+    {
+        if (!CliHelp.Write(Console.Out, helpTopic))
+            throw new UsageError($"Unknown help topic '{helpTopic}'.");
+        return 0;
+    }
+
     var grouped = args[0] is "charge" or "filter";
-    var command = grouped ? $"{args[0]} {args[1]}" : args[0];
+    command = grouped ? $"{args[0]} {args[1]}" : args[0];
     var options = ParseOptions(command, args[(grouped ? 2 : 1)..]);
     if (grouped)
     {
-        if (!OperatingSystem.IsWindows())
-            throw new IOException("Charging and filter management require Windows.");
-        if (RuntimeInformation.OSArchitecture != Architecture.X64 || !Environment.Is64BitProcess)
-            throw new IOException("Charging and filter management require Windows x64 and the x64 CLI.");
-        RunWindowsCommand(command, options, stopping.Token);
+        if (OperatingSystem.IsWindows())
+        {
+            if (RuntimeInformation.OSArchitecture != Architecture.X64 || !Environment.Is64BitProcess)
+                throw new IOException("Charging and filter management require Windows x64 and the x64 CLI.");
+            RunWindowsCommand(command, options, stopping.Token);
+        }
+        else if (OperatingSystem.IsLinux() && args[0] == "charge")
+        {
+            using var termination = command == "charge trial" ? PosixSignalRegistration.Create(PosixSignal.SIGTERM, signal =>
+            {
+                signal.Cancel = true;
+                stopping.Cancel();
+            }) : null;
+            var data = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData,
+                Environment.SpecialFolderOption.DoNotVerify);
+            if (string.IsNullOrEmpty(data))
+                throw new IOException("Cannot locate the user data directory for Linux charging settings.");
+            var userData = Path.Combine(data, "LegacyIpadCharge");
+            RunChargeCommand(new ChargeCommands(new LinuxIpadSystem(), userData,
+                new LinuxChargeCoordination(userData), "libusb", Console.Out, Console.Error),
+                command, options, stopping.Token);
+        }
+        else if (args[0] == "filter")
+            throw new IOException("libusb-win32 filter management requires Windows.");
+        else
+            throw new IOException("Charging requires Windows or Linux.");
         return 0;
     }
     var format = options.GetValueOrDefault("--format", "json");
@@ -104,12 +117,21 @@ try
         throw new UsageError("probe requires --dry-run.");
     var vid = UsbId(options.GetValueOrDefault("--vid", "05AC"));
     ushort? pid = command is "inspect" or "probe" ? UsbId(options.GetValueOrDefault("--pid", "12A2")) : null;
-    if (!OperatingSystem.IsWindows())
-        throw new IOException("PnP inventory requires Windows.");
-    var devices = await Task.Run(() => DeviceDiscovery.Read(vid, pid, command != "probe"), stopping.Token)
-        .WaitAsync(TimeSpan.FromSeconds(15), stopping.Token);
+    UsbDevice[] devices;
+    if (OperatingSystem.IsWindows())
+        devices = await Task.Run(() => DeviceDiscovery.Read(vid, pid, command != "probe"), stopping.Token)
+            .WaitAsync(TimeSpan.FromSeconds(15), stopping.Token);
+    else if (OperatingSystem.IsLinux())
+        devices = new LinuxIpadSystem().Read(vid, pid).Select(device => device.ToReport()).ToArray();
+    else
+        throw new IOException("USB inventory requires Windows or Linux.");
     if (command == "probe")
-        Diagnostics.WriteJson(Console.Out, new { dryRun = true, capability = UsbTransportCapabilities.Assess(devices), devices });
+    {
+        var capability = OperatingSystem.IsLinux() && devices.Length != 0
+            ? new UsbTransportCapabilities(nameof(ChargingState.ReadOnly), null, "USB device found in sysfs. Use charge check to verify libusb access.")
+            : UsbTransportCapabilities.Assess(devices);
+        Diagnostics.WriteJson(Console.Out, new { dryRun = true, capability, devices });
+    }
     else if (format == "csv")
         Diagnostics.WriteDevicesCsv(Console.Out, devices);
     else
@@ -120,7 +142,9 @@ try
 catch (UsageError error)
 {
     Console.Error.WriteLine(error.Message);
-    Console.Error.WriteLine(Usage);
+    Console.Error.WriteLine();
+    if (!CliHelp.Write(Console.Error, command ?? ""))
+        CliHelp.Write(Console.Error, "");
     return 2;
 }
 catch (OperationCanceledException) when (stopping.IsCancellationRequested)
@@ -150,8 +174,28 @@ static void RunWindowsCommand(string command, Dictionary<string, string> options
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "LegacyIpadCharge"),
         Path.GetTempPath());
     var hardware = new WindowsIpadSystem(paths);
-    var charge = new ChargeCommands(hardware, paths, @"Local\LegacyIpadCharge-restore-" + identity.User!.Value,
-        Console.Out, Console.Error);
+    switch (command)
+    {
+        case "filter install":
+            var bin = Required(options, "--bin");
+            RequireAdministrator(identity);
+            new FilterInstallation(hardware, paths, Console.Out).Install(bin);
+            return;
+        case "filter remove":
+            var rollback = Required(options, "--rollback-file");
+            RequireAdministrator(identity);
+            new FilterInstallation(hardware, paths, Console.Out).Remove(rollback,
+                options.GetValueOrDefault("--recover-staged-package"));
+            return;
+    }
+
+    var coordination = new WindowsChargeCoordination(paths.ChargeLock, @"Local\LegacyIpadCharge-restore-" + identity.User!.Value);
+    RunChargeCommand(new ChargeCommands(hardware, paths.UserData, coordination, "libusb0", Console.Out, Console.Error),
+        command, options, token);
+}
+
+static void RunChargeCommand(ChargeCommands charge, string command, Dictionary<string, string> options, CancellationToken token)
+{
     switch (command)
     {
         case "charge check":
@@ -168,17 +212,6 @@ static void RunWindowsCommand(string command, Dictionary<string, string> options
             return;
         case "charge restore":
             charge.Restore(token);
-            return;
-        case "filter install":
-            var bin = Required(options, "--bin");
-            RequireAdministrator(identity);
-            new FilterInstallation(hardware, paths, Console.Out).Install(bin);
-            return;
-        case "filter remove":
-            var rollback = Required(options, "--rollback-file");
-            RequireAdministrator(identity);
-            new FilterInstallation(hardware, paths, Console.Out).Remove(rollback,
-                options.GetValueOrDefault("--recover-staged-package"));
             return;
     }
 }

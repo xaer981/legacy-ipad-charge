@@ -2,7 +2,7 @@
 
 The Windows x64 CLI uses the signed libusb-win32 driver as an upper filter for one iPad. Windows keeps the existing Apple USB stack. Check the [device list](compatibility.md) and disconnect any other listed iPads before setup.
 
-[All guides](README.md) · [Check the USB port](#check-the-usb-port) · [Install the filter](#install-the-device-filter) · [Charging commands](#charging-commands) · [Troubleshooting](#troubleshooting) · [Restore 500 mA](#restore-500-ma) · [Remove the filter](#remove-the-device-filter)
+[Quick start](../README.md#quick-start) · [All guides](README.md) · [Verify downloads](#verify-the-downloads) · [Install the filter](#install-the-device-filter) · [Charging commands](#charging-commands) · [Troubleshooting](#troubleshooting) · [Remove the filter](#remove-the-device-filter)
 
 ## Windows 10 x64 (untested)
 
@@ -10,11 +10,19 @@ Installation, USB data continuity during charging, and rollback still need a har
 
 ## Check the USB port
 
-1. Confirm the current rating at 5 V for the exact port, data cable, and adapters while carrying USB data. Use the lowest rating in the path.
-2. Budget **500 mA** for a USB 2.0 iPad on a standard USB-A data port. A documented **BC 1.2 CDP** supports **1,500 mA** with data. The default **2,000 mA** request requires a path rated for 2 A at 5 V with data. [USB-IF port limits](https://compliance.usb.org/index.asp?Format=Standard&UpdateFile=Policies) · [USB-IF charging port tests](https://compliance.usb.org/index.asp?UpdateFile=Battery+Charging&tgt=post)
-3. Use `devices` and `inspect --pid <PID>` to identify the iPad and its USB path. Check the electrical rating in your hardware specifications. `bMaxPower` is the device descriptor and `ioreg` reports the limit recognized by iOS. A data-capable USB meter can measure current and voltage during the trial. [USB diagnostics](diagnostics.md#inspect-an-ipad)
+Confirm the lowest current rating for the port, cable, and any adapter or hub at 5 V with data. Then save that rating for the connected iPad's USB path. [How to check the USB port](README.md#check-the-usb-port)
 
-Keep the standard USB mode if the lowest rating is unknown or below 1 A. The app saves the limit you enter for this USB connection. It cannot measure what the hardware can supply.
+## Verify the downloads
+
+Open PowerShell in the folder where you saved the ZIP files and check their SHA-256 hashes before extracting them.
+
+```powershell
+Get-FileHash .\libusb-win32-bin-1.4.0.2.zip -Algorithm SHA256
+Get-FileHash .\legacy-ipad-charge-windows-x64.zip -Algorithm SHA256
+```
+
+- **Driver ZIP.** The expected SHA-256 is `00004C92CDB99BE36E17FB2377165EB97E63B48BA895BFC04A642EA9C3E26D94`. [libusb-win32 1.4.0.2](https://github.com/mcuee/libusb-win32/releases/tag/release_1.4.0.2)
+- **Windows app ZIP.** Compare the hash with the value for `legacy-ipad-charge-windows-x64.zip` in `SHA256SUMS.txt` from the same release. [Project releases](https://github.com/xaer981/legacy-ipad-charge/releases)
 
 ## Save the port limit
 
@@ -36,17 +44,12 @@ Connect the iPad to the port you checked. From the extracted ZIP folder, save a 
 
 `charge enable` and `charge trial` accept `--limit-ma 1000`, `1500`, or `2000`. Both require a saved rating sufficient for the request. [Save the port limit](#save-the-port-limit)
 
+Use `.\legacy-ipad-charge.exe --help` to list commands and `.\legacy-ipad-charge.exe charge trial --help` to see details for a specific command.
+
 ## Install the device filter
 
-1. Connect the iPad and confirm USB data works with the original Apple driver. Run `.\legacy-ipad-charge.exe devices` and verify its USB ID in the [device list](compatibility.md).
-2. Download `libusb-win32-bin-1.4.0.2.zip` from the [libusb-win32 release](https://github.com/mcuee/libusb-win32/releases/tag/release_1.4.0.2). In PowerShell, run this from the folder where you saved the download.
-
-   ```powershell
-   Get-FileHash .\libusb-win32-bin-1.4.0.2.zip -Algorithm SHA256
-   ```
-
-   The hash should be `00004C92CDB99BE36E17FB2377165EB97E63B48BA895BFC04A642EA9C3E26D94`. If it matches, extract the entire archive.
-
+1. Download and verify both ZIPs, then extract them. Keep all files in the driver package together. [Download names and hashes](#verify-the-downloads)
+2. Connect the iPad and confirm USB data works with the original Apple driver. From the app folder, run `.\legacy-ipad-charge.exe devices` and verify its USB ID in the [device list](compatibility.md).
 3. Find PowerShell in the Start menu and choose **Run as administrator**. In the first command, use the folder containing `legacy-ipad-charge.exe`. In the second, use the `bin` folder inside the extracted driver package. The installer saves a backup and prints `Rollback file:` followed by the path you will need to remove the filter. Keep that file and leave the extracted driver package in place.
 
    ```powershell

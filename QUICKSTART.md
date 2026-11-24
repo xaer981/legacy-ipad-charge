@@ -6,49 +6,69 @@
 
 ## Before you start
 
-- **Windows x64.** The app runs without installing .NET. The tested setup used Windows 11. [Windows 10 status](docs/libusb-charge.md#windows-10-x64-untested)
-- **One iPad and a USB data cable.** Connect the iPad and make sure Windows recognizes it. [Check your iPad model](docs/compatibility.md) · [Check the port, cable, and adapter](docs/libusb-charge.md#check-the-usb-port)
-- **Driver setup.** First-time setup needs administrator access and the separate [signed libusb-win32 package](docs/libusb-charge.md#install-the-device-filter). It lets the app send charging requests while Windows keeps the Apple driver. [Upgrade from the PowerShell release](docs/libusb-charge.md#upgrade-from-the-powershell-release)
+Use one [listed iPad](docs/compatibility.md) and a USB data cable. The .NET runtime is included. Tested on Windows 11 x64. [Windows 10 status](docs/libusb-charge.md#windows-10-x64-untested)
+
+Jailbreak is optional. [Verify charging on stock iOS or with jailbreak](docs/README.md#verify-charging)
 
 ## Quick start
 
-### 1. Find your iPad
+### 1. Check your USB port
 
-Open the extracted ZIP folder in File Explorer. Type `powershell` in the address bar and press Enter. Run this command and compare the USB ID with the [device list](docs/compatibility.md).
+Connect the iPad and check that Windows recognizes it. For the first trial, confirm that the port, cable, and any adapter or hub support **1 A at 5 V with USB data**. Stay at the standard USB setting if you can't confirm the rating. [How to check the USB port](docs/README.md#check-the-usb-port)
+
+> [!TIP]
+> In my setup, a **USB-A → USB-C adapter** let me use the iPad's original USB-A data cable with a higher-current USB-C port on my PC. Check the ratings of the specific port and adapter you use.
+
+### 2. Download the driver
+
+Download `libusb-win32-bin-1.4.0.2.zip` from the [libusb-win32 release](https://github.com/mcuee/libusb-win32/releases/tag/release_1.4.0.2) and extract the entire ZIP. The app uses this signed package to add a filter for the connected iPad alongside the existing Apple driver. [Verify the download](docs/libusb-charge.md#verify-the-downloads)
+
+### 3. Download the Windows app
+
+If you opened this file from the extracted Windows ZIP, use the folder containing `legacy-ipad-charge.exe`. If you need a fresh copy, download `legacy-ipad-charge-windows-x64.zip` from [Releases](https://github.com/xaer981/legacy-ipad-charge/releases) and extract it. [Verify the download](docs/libusb-charge.md#verify-the-downloads)
+
+### 4. Install the filter and reconnect
+
+If you already installed the filter, run `.\legacy-ipad-charge.exe charge check` from the app folder. If it reports `PASS`, go to step 5. [Troubleshoot an existing filter](docs/libusb-charge.md#troubleshooting)
+
+Open **PowerShell as administrator** from the Start menu. Replace the first path with the folder containing the app and the second with the `bin` folder inside the extracted driver ZIP. You can copy each path from the File Explorer address bar.
 
 ```powershell
-.\legacy-ipad-charge.exe devices
+Set-Location "C:\path\to\legacy-ipad-charge"
+.\legacy-ipad-charge.exe filter install --bin "C:\path\to\libusb-win32-bin-1.4.0.2\bin"
 ```
 
-### 2. Install and check the filter
-
-Follow the [installation guide](docs/libusb-charge.md#install-the-device-filter). Keep the rollback file so you can remove the filter later. Reconnect the iPad to the same port and run this check. [Already installed the filter?](docs/libusb-charge.md#upgrade-from-the-powershell-release)
+Keep the path printed after `Rollback file:`. Unplug the iPad, reconnect it to the same USB port, and check the filter.
 
 ```powershell
 .\legacy-ipad-charge.exe charge check
 ```
 
-Continue when you see `PASS`. [If the check fails](docs/libusb-charge.md#troubleshooting)
+Continue when you see `PASS`. [Installation details](docs/libusb-charge.md#install-the-device-filter) · [If the check fails](docs/libusb-charge.md#troubleshooting)
 
-### 3. Try 1 A for 30 seconds
+### 5. Try 1 A, then enable charging
 
-First confirm that the **port, cable, and any adapter** each support **1 A at 5 V while carrying data**. Keep the standard USB mode if you can't confirm the rating. The app saves the number you enter. [How to check the rating](docs/libusb-charge.md#check-the-usb-port)
+Save the verified 1 A limit for this USB connection.
 
 ```powershell
 .\legacy-ipad-charge.exe charge confirm-port --max-ma 1000
 ```
 
-After `PORT_LIMIT_SAVED`, start the trial. It requests 1 A for 30 seconds, then requests the 500 mA baseline. Look for `RAISE_OK` and `RESTORE_OK`.
+After `PORT_LIMIT_SAVED`, start the 30-second trial. Look for `RAISE_OK` and `RESTORE_OK`.
 
 ```powershell
 .\legacy-ipad-charge.exe charge trial
 ```
 
-Check that USB data stays connected and verify charging. [Standard iOS](docs/libusb-charge.md#stock-ios) · [Jailbroken iPad](docs/libusb-charge.md#jailbreak-and-ssh) · [Troubleshooting](docs/libusb-charge.md#troubleshooting)
+If both messages appear and charging and USB data worked during the trial, enable 1 A without a timer. [Verify charging on the iPad](docs/README.md#verify-charging)
+
+```powershell
+.\legacy-ipad-charge.exe charge enable --limit-ma 1000
+```
+
+Look for `ENABLE_OK`. To return to 500 mA, run `.\legacy-ipad-charge.exe charge restore`. [Set up 1.5 A or 2 A](#daily-use) · [Remove the filter](docs/libusb-charge.md#remove-the-device-filter)
 
 ## Daily use
-
-Staying at **1 A**? After a successful 1 A trial, run `charge enable --limit-ma 1000`.
 
 For the default **2 A**, confirm the port, cable, and any adapter all support 2 A at 5 V with data. Save the higher rating and run a new trial.
 
@@ -74,6 +94,8 @@ Run this command to return to 500 mA.
 When removing an active filter, unplug and reconnect the iPad when prompted, then run the same rollback command again. [Remove the filter](docs/libusb-charge.md#remove-the-device-filter)
 
 ## Help
+
+Run `.\legacy-ipad-charge.exe --help` to list the commands. Use `.\legacy-ipad-charge.exe charge trial --help` for the options and defaults of a specific command.
 
 To share a USB report, run this command and review the JSON before posting. [Compatibility report](docs/compatibility.md#report-your-ipad)
 
