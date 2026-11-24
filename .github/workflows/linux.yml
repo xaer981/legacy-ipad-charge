@@ -1,0 +1,46 @@
+name: Linux build and test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: 10.0.x
+      - name: Build and test .NET
+        run: |
+          dotnet build LegacyIpadCharge.slnx '-p:Platform=Any CPU' -warnaserror
+          dotnet run --no-build --project tests/LegacyIpadCharge.Tests -p:Platform=AnyCPU
+      - name: Build Linux x64 archive
+        run: bash tools/Build-LinuxRelease.sh
+      - name: Check the packaged CLI
+        shell: bash
+        run: |
+          cd bin/release
+          sha256sum -c legacy-ipad-charge-linux-x64.tar.gz.sha256
+          output=$(mktemp -d)
+          tar -xf legacy-ipad-charge-linux-x64.tar.gz -C "$output"
+          test -x "$output/legacy-ipad-charge"
+          "$output/legacy-ipad-charge" --version | grep -Ex '[0-9]+\.[0-9]+\.[0-9]+'
+          "$output/legacy-ipad-charge" --help | grep -F 'charge restore'
+          "$output/legacy-ipad-charge" charge trial --help | grep -F 'Trial duration (1-180, default: 30)'
+          "$output/legacy-ipad-charge" devices | python3 -c 'import json, sys; assert isinstance(json.load(sys.stdin), list)'
+          "$output/legacy-ipad-charge" report --input ../../tests/LegacyIpadCharge.Tests/Fixtures/charger.txt | python3 -c 'import json, sys; assert json.load(sys.stdin)["instantAmperageMa"] == -494'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: legacy-ipad-charge-linux-x64
+          path: |
+            bin/release/legacy-ipad-charge-linux-x64.tar.gz
+            bin/release/legacy-ipad-charge-linux-x64.tar.gz.sha256
+          if-no-files-found: error

@@ -28,6 +28,7 @@ try {
         'LICENSE'
         'docs/README.md'
         'docs/libusb-charge.md'
+        'docs/linux.md'
         'docs/compatibility.md'
         'docs/diagnostics.md'
         'docs/references.md'

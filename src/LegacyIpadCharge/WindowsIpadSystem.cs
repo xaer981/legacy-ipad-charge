@@ -32,6 +32,8 @@ internal sealed class WindowsIpadSystem(ChargingPaths paths) : IChargeHardware, 
             ConfigurationManager.StringsProperty(node, DeviceDiscovery.DeviceProperties, 19));
     }
 
+    public string? PortPath(ChargeDevice device) => ChargingIpad.WindowsPortPath(device);
+
     public IChargeConnection Open(ChargeDevice device)
     {
         var driver = Service("libusb0");

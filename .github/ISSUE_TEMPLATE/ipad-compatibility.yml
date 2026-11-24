@@ -5,7 +5,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        A report from the stock Apple USB driver is welcome. Review anything you paste and remove serial numbers, device instance IDs, and other personal identifiers.
+        Read-only USB reports and charging test results are welcome from Windows and Linux. Remove serial numbers, device instance IDs, and other personal identifiers before posting.
   - type: input
     id: ipad
     attributes:
@@ -28,16 +28,16 @@ body:
     id: tool-version
     attributes:
       label: Tool version or source commit
-      description: Include the release tag, the output of legacy-ipad-charge.exe --version, or the commit used for a source build. If you ran a stock-driver check without the tool, say so.
-      placeholder: v0.1.0
+      description: Include the release tag, the CLI version, or the commit used for a source build. Say if you checked USB detection using only the operating system.
+      placeholder: v0.2.0
     validations:
       required: true
   - type: input
-    id: windows
+    id: host-os
     attributes:
-      label: Windows version and build
-      description: Include the Apple USB driver version and Memory Integrity status if known.
-      placeholder: Windows 11 x64, build 26100, Apple USB 538.0.0.0
+      label: Host OS version
+      description: On Windows, include the build, Apple USB driver version, and Memory Integrity status if known. On Linux, include the distribution, kernel version, and whether it is a native host or WSL.
+      placeholder: Windows 11 x64, build 26100, or Debian 13 x64, Linux 6.12
     validations:
       required: true
   - type: input
@@ -51,13 +51,13 @@ body:
     id: usb-report
     attributes:
       label: USB report
-      description: Paste the reviewed usb-report.json from the Help section of the README.
+      description: Paste the reviewed usb-report.json from the Windows or Linux guide.
       render: json
   - type: textarea
     id: result
     attributes:
       label: What happened?
-      description: For a charging test, include the mode, limit, duration, iPad workload, restore result, and whether USB data stayed connected. Add any charge icon observations, USB meter readings, or ioreg measurements before, during, and after the test. Include the libusb-win32 version if known.
-      placeholder: Windows detected the iPad with the stock Apple driver.
+      description: For a charging test, include the mode, limit, duration, iPad workload, restore result, and whether USB data stayed connected. Add charge icon observations, USB meter readings, or ioreg measurements before, during, and after. On Windows, include the libusb-win32 version if known.
+      placeholder: On Debian x64, devices listed 05AC:12A2 and charge check reported PASS.
     validations:
       required: true

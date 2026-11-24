@@ -1,8 +1,8 @@
 # Diagnostics and battery telemetry
 
-[All guides](README.md) · [Charging troubleshooting](libusb-charge.md#troubleshooting)
+[All guides](README.md) · [Windows troubleshooting](libusb-charge.md#troubleshooting) · [Linux troubleshooting](linux.md#troubleshooting)
 
-Run these commands from the extracted Windows ZIP folder. The executable includes the .NET runtime. USB inventory requires Windows.
+Run the Windows examples from the extracted ZIP folder. On Linux, use `./legacy-ipad-charge` with the same arguments. The executables include the .NET runtime. [Linux setup](linux.md)
 
 ## Inspect an iPad
 
@@ -13,9 +13,9 @@ Run these commands from the extracted Windows ZIP folder. The executable include
 .\legacy-ipad-charge.exe report --format csv
 ```
 
-Use `devices` to find an iPad's VID and PID and pass them to `inspect`. The example USB ID belongs to the iPad 2 GSM. The inventory includes the physical USB device, its `MI_XX` functions, driver services and filters, interface GUIDs, and port topology. `portChain` starts at the root hub. `connectionStatus` explains failures to read hub-port data. The CSV report has one row per PnP node and omits device serial numbers and instance IDs.
+Use `devices` to find an iPad's VID and PID and pass them to `inspect`. The example USB ID belongs to the iPad 2 GSM. On Windows, inventory includes the physical USB device, its `MI_XX` functions, driver services and filters, interface GUIDs, and port topology. `portChain` starts at the root hub, and `connectionStatus` explains failures to read hub-port data. On Linux, inventory reports USB IDs, port chains, physical paths where available, and USB authorization status. The CSV report omits device serial numbers and instance IDs.
 
-`probe --dry-run` reads PnP information about the WinUSB path. `winUsbServiceSeen` describes the PnP service assignment and `winRtUsbRestricted` reports the WinRT USB restriction when available. For the charging filter, use `charge check` in the [charging guide](libusb-charge.md#run-a-timed-trial).
+On Windows, `probe --dry-run` reads PnP information about the WinUSB path. `winUsbServiceSeen` describes the PnP service assignment and `winRtUsbRestricted` reports the WinRT USB restriction when available. On Linux, inventory and `probe --dry-run` read sysfs. A physical USB path is shown for a supported unambiguous PCI USB controller and port chain. Use `charge check` to verify that the charging transport can open the selected iPad.
 
 ## Read battery current
 
@@ -28,7 +28,7 @@ If you already have shell access on the iPad, save the output of `ioreg -r -l -w
 .\legacy-ipad-charge.exe monitor --source ssh --host ipad --interval 20 --duration 180 --format csv
 ```
 
-`--input -` reads the snapshot from stdin. Live sampling requires Windows OpenSSH, working key-based access, and a verified host key in `known_hosts`. Use an SSH alias, the default key, `ssh-agent`, or `--identity <file>`. The CLI runs a fixed remote command and checks the existing host key without writing to `known_hosts`. You can import a saved snapshot if the OpenSSH versions cannot connect. `monitor --format json` writes one JSON object per line.
+`--input -` reads the snapshot from stdin. Live sampling requires OpenSSH on Windows or Linux, working key-based access, and a verified host key in `known_hosts`. Use an SSH alias, the default key, `ssh-agent`, or `--identity <file>`. The CLI runs a fixed remote command and checks the existing host key without writing to `known_hosts`. You can import a saved snapshot if the OpenSSH versions cannot connect. `monitor --format json` writes one JSON object per line.
 
 `monitor` logs failed reads to stderr and continues sampling. The JSON or CSV stream contains successful readings. A snapshot needs at least one usable value and may contain at most one AppleARMPMUCharger node. If the whole window contains no successful readings, the command exits with code `1`.
 

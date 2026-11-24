@@ -20,6 +20,8 @@ internal static class AppleChargingProtocol
     // Reference from FD-/usb_charge. Field semantics and response on iPad 2 remain unverified.
     internal static readonly UsbSetupPacket LinuxIpadFixture = new(0x40, 0x40, 500, 1600, 0);
 
+    internal static UsbSetupPacket ActiveCurrent(int offsetMa) => new(0x40, 0x40, 0, checked((ushort)offsetMa), 0);
+
     internal static bool IsKnownFixture(UsbSetupPacket packet) => packet == LinuxIpadFixture;
 }
 

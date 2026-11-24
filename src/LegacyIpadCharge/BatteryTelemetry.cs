@@ -195,12 +195,15 @@ internal static class BatteryTelemetry
     internal static async Task<BatterySample> ReadSsh(string destination, string? identity,
         CancellationToken cancellation)
     {
-        if (!OperatingSystem.IsWindows())
-            throw new IOException("Live SSH sampling uses Windows OpenSSH.");
+        if (!OperatingSystem.IsWindows() && !OperatingSystem.IsLinux())
+            throw new IOException("Live SSH sampling requires OpenSSH on Windows or Linux.");
         if (!ValidSshHost(destination))
             throw new ArgumentException("Use a hostname or IP, optionally prefixed with user@.");
 
-        var start = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "OpenSSH", "ssh.exe"))
+        var sshExecutable = OperatingSystem.IsWindows()
+            ? Path.Combine(Environment.SystemDirectory, "OpenSSH", "ssh.exe")
+            : "ssh";
+        var start = new ProcessStartInfo(sshExecutable)
         {
             UseShellExecute = false,
             RedirectStandardOutput = true,
