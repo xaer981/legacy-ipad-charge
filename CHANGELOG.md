@@ -4,7 +4,7 @@
 
 - Added a Linux x64 CLI using the system `libusb-1.0` with the same charging and telemetry commands as Windows. The packaged CLI requires an identifiable native USB path to request more current. [Linux setup](docs/linux.md)
 - Added descriptions to `--help` and detailed help for individual commands, such as `charge trial --help`.
-- Simplified the Windows setup from the first USB port check through a timed trial and daily charging. [Windows setup](README.md#windows)
+- Added parallel quick starts for Windows and Linux, from checking the USB port through a timed trial and daily charging. [Windows setup](README.md#quick-start-windows) · [Linux setup](README.md#quick-start-linux)
 - Added Linux build, test, and packaging checks alongside the Windows workflow.
 
 ### Downloads

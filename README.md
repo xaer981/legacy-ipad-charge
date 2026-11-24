@@ -4,16 +4,16 @@
 
 <p align="center">
   <a href="https://github.com/xaer981/legacy-ipad-charge/releases"><strong>Downloads</strong></a> ·
-  <a href="#windows">Windows setup</a> ·
-  <a href="#linux">Linux setup</a> ·
+  <a href="#quick-start-windows">Quick start Windows</a> ·
+  <a href="#quick-start-linux">Quick start Linux</a> ·
   <a href="#devices">Devices</a> ·
   <a href="#daily-use">Daily use</a> ·
   <a href="docs/README.md">Documentation</a>
 </p>
 
 <p align="center">
-  <a href="#windows"><img src="https://img.shields.io/badge/Windows-x64-35638c?style=flat-square" alt="Windows x64"></a>
-  <a href="#linux"><img src="https://img.shields.io/badge/Linux-x64-6c654a?style=flat-square" alt="Linux x64"></a>
+  <a href="#quick-start-windows"><img src="https://img.shields.io/badge/Windows-x64-35638c?style=flat-square" alt="Windows x64"></a>
+  <a href="#quick-start-linux"><img src="https://img.shields.io/badge/Linux-x64-6c654a?style=flat-square" alt="Linux x64"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-61746c?style=flat-square" alt="MIT license"></a>
   <a href="https://boosty.to/xaer981"><img src="https://img.shields.io/badge/Boosty-support-c97932?style=flat-square" alt="Support on Boosty"></a>
 </p>
@@ -31,11 +31,11 @@ Use one [listed iPad](#devices) and a USB data cable. Jailbreak is optional. Wit
 
 ## Quick start
 
-Choose [Windows x64](#windows) or [Linux x64](#linux). Both builds include the .NET runtime.
+Both builds include the .NET runtime. [Quick start Windows](#quick-start-windows) · [Quick start Linux](#quick-start-linux)
 
-### Windows
+### Quick start Windows
 
-Tested on Windows 11 x64. [Windows 10 status](docs/libusb-charge.md#windows-10-x64-untested)
+Tested on Windows 11 x64. [Windows 10 status](docs/libusb-charge.md#windows-10-x64-untested) · [Switch to Linux](#quick-start-linux)
 
 #### 1. Check your USB port
 
@@ -93,9 +93,85 @@ If both messages appear and charging and USB data worked during the trial, enabl
 
 Look for `ENABLE_OK`. To return to 500 mA, run `.\legacy-ipad-charge.exe charge restore`. [Set up 1.5 A or 2 A](#daily-use) · [Remove the filter](docs/libusb-charge.md#remove-the-device-filter)
 
-### Linux
+### Quick start Linux
 
-The Linux x64 CLI uses the system `libusb-1.0` library and needs USB access to the iPad. A physical USB path on a supported controller is required to request more current. **Native Linux charging verification is pending.** [Linux setup and first trial](docs/linux.md) · [Kali WSL test results](docs/compatibility.md#linux)
+Use a glibc-based Linux x64 system and connect the iPad to a native USB port for charging. **Native Linux charging verification is pending.** Use WSL and virtual machines with USB passthrough for diagnostics. A guest USB path can hide the physical port. [Kali WSL results](docs/compatibility.md#linux) · [Switch to Windows](#quick-start-windows)
+
+#### 1. Check the USB connection
+
+Connect one supported iPad using a USB data cable and unlock it. For the first trial, confirm that the port, cable, and any adapter or hub support **1 A at 5 V with USB data**. [How to check the USB port](docs/README.md#check-the-usb-port)
+
+#### 2. Download and extract the Linux app
+
+Get `legacy-ipad-charge-linux-x64.tar.gz` and `legacy-ipad-charge-linux-x64.tar.gz.sha256` from [Releases](https://github.com/xaer981/legacy-ipad-charge/releases). If the archive isn't listed, [build it from source](docs/linux.md#build-from-source).
+
+In the folder containing both files, check the archive's SHA-256.
+
+```bash
+sha256sum -c legacy-ipad-charge-linux-x64.tar.gz.sha256
+```
+
+When it reports `OK`, extract the archive and open its folder.
+
+```bash
+mkdir -p legacy-ipad-charge-linux
+tar -xf legacy-ipad-charge-linux-x64.tar.gz -C legacy-ipad-charge-linux
+cd legacy-ipad-charge-linux
+```
+
+#### 3. Install libusb
+
+Install your distribution's package for `libusb-1.0.so.0` if it isn't already present. On Debian, Ubuntu, and Kali, use `apt`.
+
+```bash
+sudo apt install libusb-1.0-0
+```
+
+#### 4. Check device access
+
+Run these commands as your normal user.
+
+```bash
+./legacy-ipad-charge devices
+./legacy-ipad-charge charge check
+```
+
+Continue when `devices` shows the iPad with a non-null `locationPath` and `charge check` reports `PASS`. If `locationPath` is `null`, use a physical USB port on a supported native Linux controller for charging.
+
+<details>
+<summary>Fix a USB permission error</summary>
+
+For an active desktop session managed by systemd, add this rule to `/etc/udev/rules.d/70-legacy-ipad-charge.rules` with administrator permissions. Replace `12a2` with your iPad's product ID from `devices` in lowercase.
+
+```udev
+SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="05ac", ATTR{idProduct}=="12a2", TAG+="uaccess"
+```
+
+Run `sudo udevadm control --reload`, reconnect the iPad to the same port, and repeat `charge check`. Keep using the same account for charging commands. [USB permissions on headless systems](docs/linux.md#2-check-detection-and-access)
+
+</details>
+
+#### 5. Run a 1 A trial and enable charging
+
+Save the verified 1 A limit for this USB connection.
+
+```bash
+./legacy-ipad-charge charge confirm-port --max-ma 1000
+```
+
+After `PORT_LIMIT_SAVED`, start the 30-second trial and check for `RAISE_OK` and `RESTORE_OK`.
+
+```bash
+./legacy-ipad-charge charge trial
+```
+
+If both messages appear and charging and USB data worked during the trial, enable 1 A without a timer. [Verify charging](docs/linux.md#verify-charging)
+
+```bash
+./legacy-ipad-charge charge enable --limit-ma 1000
+```
+
+Look for `ENABLE_OK`. To return to 500 mA, run `./legacy-ipad-charge charge restore`. [Set up 1.5 A or 2 A](docs/linux.md#4-enable-charging-for-daily-use) · [Linux troubleshooting](docs/linux.md#troubleshooting)
 
 ## Devices
 

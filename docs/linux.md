@@ -5,11 +5,11 @@ Use a compatible USB data connection to charge an older iPad. The CLI uses the L
 [Download](#1-get-the-cli) · [USB access](#2-check-detection-and-access) · [First trial](#3-try-a-higher-current) · [Daily use](#4-enable-charging-for-daily-use) · [Troubleshooting](#troubleshooting)
 
 > [!NOTE]
-> A separate libusb probe verified the Apple request on an iPad 2 over USB/IP in Kali WSL. Hardware verification of this CLI on native Linux is pending. Use the CLI in WSL for diagnostics. Higher-current commands require a physical USB path visible in Linux. [Test results](https://github.com/xaer981/legacy-ipad-charge/blob/main/docs/compatibility.md#linux)
+> A separate libusb probe verified the Apple request on an iPad 2 over USB/IP in Kali WSL. Hardware verification of this CLI on native Linux is pending. Use WSL and virtual machines with USB passthrough for diagnostics. A guest USB path can hide the physical port used to power the iPad. [Test results](https://github.com/xaer981/legacy-ipad-charge/blob/main/docs/compatibility.md#linux)
 
 ## 1. Get the CLI
 
-Download `legacy-ipad-charge-linux-x64.tar.gz` and `legacy-ipad-charge-linux-x64.tar.gz.sha256` from [Releases](https://github.com/xaer981/legacy-ipad-charge/releases). If the archive is missing, [build it from source](#build-from-source). The archive includes the .NET runtime. For charging, install the shared library `libusb-1.0.so.0` from your distribution. On Debian, Ubuntu, and Kali, the package is `libusb-1.0-0`.
+Download `legacy-ipad-charge-linux-x64.tar.gz` and `legacy-ipad-charge-linux-x64.tar.gz.sha256` from [Releases](https://github.com/xaer981/legacy-ipad-charge/releases). If the archive is missing, [build it from source](#build-from-source). The archive includes the .NET runtime for glibc-based Linux x64. For charging, install the shared library `libusb-1.0.so.0` from your distribution. On Debian, Ubuntu, and Kali, the package is `libusb-1.0-0`. [Linux runtime targets](https://learn.microsoft.com/en-us/dotnet/core/rid-catalog#linux-rids)
 
 ```bash
 sha256sum -c legacy-ipad-charge-linux-x64.tar.gz.sha256
@@ -31,7 +31,7 @@ Connect one supported iPad with a USB data cable and unlock it. Check that Linux
 ./legacy-ipad-charge charge check
 ```
 
-If `devices` lists your iPad and `charge check` reports permission denied, use your distribution's USB permissions for that device. On a desktop with systemd and an active local session, you can add the following line to `/etc/udev/rules.d/70-legacy-ipad-charge.rules` with administrator permissions. `12a2` is the iPad 2 GSM product ID. For a different model, substitute its own listed USB product ID.
+If `devices` lists your iPad and `charge check` reports permission denied, use your distribution's USB permissions for that device. On a desktop with systemd and an active local session, you can add the following line to `/etc/udev/rules.d/70-legacy-ipad-charge.rules` with administrator permissions. `12a2` is the iPad 2 GSM product ID. For a different model, substitute its listed USB product ID in lowercase.
 
 ```udev
 SUBSYSTEM=="usb", ENV{DEVTYPE}=="usb_device", ATTR{idVendor}=="05ac", ATTR{idProduct}=="12a2", TAG+="uaccess"
@@ -61,6 +61,8 @@ After a successful trial, use `charge enable --limit-ma 1000` to keep that setti
 ./legacy-ipad-charge charge trial --limit-ma 2000
 ./legacy-ipad-charge charge enable
 ```
+
+For 1.5 A, confirm and save a sufficient USB-path rating, then pass `--limit-ma 1500` to both `charge trial` and `charge enable`.
 
 `charge enable` leaves the selected limit active without a timer. After a reconnect or reboot, use `charge check` before enabling it again. To end the session, request 500 mA. This works without a saved port rating.
 
